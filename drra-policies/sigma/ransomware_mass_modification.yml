@@ -1,0 +1,69 @@
+title: Ransomware - Mass File Modification
+id: 12e45678-abcd-1234-ef56-789012345678
+description: Detects mass file modification patterns consistent with ransomware encryption. Triggers when >15% of files in a directory tree are modified within 60 seconds.
+status: experimental
+author: Resilience Forge Team
+date: 2026/02/19
+
+logsource:
+  category: file_access
+  product: windows
+  service: sysmon
+
+detection:
+  selection:
+    EventID: 11  # FileCreate / FileCreateTime changed (Sysmon)
+    Image|contains:
+      - 'explorer.exe'
+      - 'svchost.exe'
+      - 'spoolsv.exe'
+      - 'dwm.exe'
+    TargetFilename|contains:
+      - 'C:\Users\'
+      - 'C:\ProgramData\'
+      - 'D:\'
+      - 'E:\'
+      - '\\?\' # UNC paths
+  
+  modification_spike:
+    EventID: 11
+    TimeframeWindow: 60s
+    FileCountThreshold: 0.15  # 15% of directory
+  
+  exclude_whitelist:
+    Image|endswith:
+      - 'Windows\System32\svchost.exe'
+      - 'Windows\System32\ctfmon.exe'
+      - 'OneDrive.exe'
+      - 'Dropbox.exe'
+  
+  filter_system:
+    TargetFilename|contains:
+      - '$Recycle.Bin'
+      - 'AppData\Local\Temp'
+      - 'Windows\Temp'
+
+  condition: (selection and modification_spike) and not exclude_whitelist and not filter_system
+
+falsepositives:
+  - Legitimate bulk file operations (backups, software installs)
+  - IDE/code editors during batch operations
+  - Build systems (npm install, gradle build)
+
+level: high
+tags:
+  - ransomware
+  - file_modification
+  - mass_activity
+  - t1486  # MITRE ATT&CK: Data Encrypted/Destroyed
+
+references:
+  - https://attack.mitre.org/techniques/T1486/
+  - https://docs.resilience-forge.com/sentinel/detections/mass-modification
+
+# DRRA-specific enrichment
+enrichment:
+  entropy_check: true  # Correlate with entropy analysis
+  process_correlation: true  # Check parent/child processes
+  vss_status: true  # Was VSS disabled before this?
+  lateral_movement: true  # Over RDP/SMB?

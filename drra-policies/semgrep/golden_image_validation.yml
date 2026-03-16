@@ -1,0 +1,88 @@
+rules:
+  - id: golden_image_binary_validation
+    patterns:
+      - pattern-either:
+          - pattern: |
+              # Missing binary integrity check after recovery
+              restored_file = ...
+              # No hash validation of system binary
+          - pattern: |
+              import shutil
+              shutil.copy($FILE, ...)
+              # No MD5/SHA256 validation after copy
+    
+    message: |
+      System binary restored without integrity validation. Golden image validation requires hash verification to ensure restored binary matches baseline.
+      
+      ✅ CORRECT:
+      ```python
+      import hashlib
+      
+      def validate_restored_binary(filepath, golden_hash):
+          actual_hash = hashlib.sha256(open(filepath, 'rb').read()).hexdigest()
+          if actual_hash != golden_hash:
+              raise IntegrityError(f"Binary mismatch: {filepath}")
+          logger.info(f"✅ Validated {filepath}: {actual_hash}")
+      
+      # Validate every restored system binary
+      for binary_path, expected_hash in golden_manifest.items():
+          validate_restored_binary(binary_path, expected_hash)
+      ```
+      
+      ❌ WRONG:
+      ```python
+      # Restore without validation!
+      shutil.copytree(backup_path, system_path)
+      ```
+    
+    languages: [python, powershell]
+    severity: HIGH
+    category: security
+    cwe:
+      - CWE-353  # Missing Support for Integrity Check
+      - CWE-345  # Insufficient Verification of Data Authenticity
+    owasp:
+      - A08:2021  # Software and Data Integrity Failures
+    metadata:
+      drra-component: shield
+      phase: post-recovery-validation
+      resilience-requirement: golden-image-validation
+      references:
+        - https://docs.resilience-forge.com/shield/recovery/golden-image-validation
+
+  - id: golden_image_configuration_consistency
+    patterns:
+      - pattern: |
+          # Configuration restored without baseline comparison
+          restore_config_file($FILE, ...)
+          # No check that config matches golden baseline
+
+    message: |
+      Configuration file restored without consistency check against golden image baseline. Compromised configurations could survive recovery.
+      
+      ✅ CORRECT:
+      ```python
+      def validate_config(config_file, golden_baseline):
+          current_config = parse_config(config_file)
+          
+          for key, expected_value in golden_baseline.items():
+              actual_value = current_config.get(key)
+              if actual_value != expected_value:
+                  raise ConfigMismatchError(
+                      f"{key}: expected {expected_value}, got {actual_value}"
+                  )
+          
+          log_validation_success(config_file)
+      ```
+      
+      ❌ WRONG:
+      ```python
+      restore_from_snapshot(backup_path)  # No validation
+      ```
+    
+    languages: [python]
+    severity: MEDIUM
+    category: security
+    metadata:
+      drra-component: shield
+      phase: post-recovery-validation

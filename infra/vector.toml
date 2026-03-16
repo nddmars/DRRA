@@ -1,0 +1,109 @@
+"""Vector configuration for immutable telemetry pipeline"""
+
+# Vector sink configuration for Resilience Forge
+# Processes: File system events → Entropy analysis → MinIO (S3-compatible)
+
+sources:
+  file_monitor:
+    type: file
+    paths:
+      - "/var/log/resilience-forge/*.log"
+    read_from: beginning
+    
+  system_metrics:
+    type: internal_metrics
+    
+  kafka_input:
+    type: kafka
+    bootstrap_servers:
+      - "localhost:9092"
+    topics:
+      - resilience_events
+      - sentinel_detections
+      - shield_actions
+    group_id: vector_consumer
+
+transforms:
+  parse_json:
+    type: remap
+    inputs:
+      - kafka_input
+    source: |
+      . = parse_json!(.message)
+      .timestamp = now()
+      .source = get_source_type!()
+      
+  enrich_detection:
+    type: remap
+    inputs:
+      - parse_json
+    source: |
+      if .event_type == "detection" {
+        .severity = if .threat_level == "critical" { "5" } else if .threat_level == "high" { "4" } else if .threat_level == "medium" { "3" } else { "2" }
+        .tags = ["ransomware", "detection", .pattern_type]
+      }
+
+sinks:
+  minio_immutable:
+    type: aws_s3
+    inputs:
+      - enrich_detection
+    region: us-east-1
+    bucket: immutable-logs
+    key_prefix: "resilience-forge/{{ timestamp }}/{{ .event_id }}"
+    
+    # S3 endpoint (MinIO)
+    endpoint: "http://minio:9000"
+    
+    # Authentication
+    access_key: "${MINIO_ACCESS_KEY}"
+    secret_key: "${MINIO_SECRET_KEY}"
+    
+    # Immutability
+    storage_class: "STANDARD"
+    partitions:
+      event_date: "%Y-%m-%d"
+      event_type: "{{ .event_type }}"
+      
+    # Compression
+    compression: gzip
+    
+    # Batch settings for throughput
+    batch:
+      timeout_secs: 30
+      max_bytes: 10485760  # 10MB
+      
+    encoding:
+      codec: json
+
+  postgres_audit:
+    type: postgresql
+    inputs:
+      - enrich_detection
+    connection_string: "postgresql://drra_admin:drra_secure_password@localhost:5432/resilience_forge"
+    table: "event_audit_log"
+    encoding:
+      codec: json
+      
+  metrics_prometheus:
+    type: prometheus_exporter
+    inputs:
+      - system_metrics
+    address: "0.0.0.0:9598"
+
+# Healthchecks ensure pipeline is operational
+healthchecks:
+  require_healthy: true
+
+# Logging for Vector pipeline itself
+log_schema:
+  host_key: "vector_host"
+  message_key: "message"
+  timestamp_key: "timestamp"
+
+# Internal metrics about pipeline performance
+metrics:
+  namespace: resilience_forge
+
+# Send Vector metrics to Prometheus
+# Metrics visible at http://localhost:9090/targets

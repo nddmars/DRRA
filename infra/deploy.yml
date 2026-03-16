@@ -1,0 +1,122 @@
+---
+# Ansible playbook for deploying Resilience Forge to target hosts
+
+- name: "Deploy Resilience Forge (DRRA)"
+  hosts: ransomware_defense_hosts
+  become: yes
+  vars:
+    docker_compose_version: "2.20.0"
+    python_version: "3.11"
+
+  pre_tasks:
+    - name: "Update system packages"
+      apt:
+        update_cache: yes
+        upgrade: dist
+        cache_valid_time: 3600
+      when: ansible_os_family == "Debian"
+
+    - name: "Install prerequisites"
+      apt:
+        name:
+          - git
+          - curl
+          - wget
+          - python3-pip
+          - python3-dev
+          - libpq-dev
+          - build-essential
+        state: present
+      when: ansible_os_family == "Debian"
+
+  tasks:
+    - name: "Install Docker"
+      shell: |
+        curl -fsSL https://get.docker.com -o get-docker.sh
+        sh get-docker.sh
+      args:
+        creates: /usr/bin/docker
+
+    - name: "Install Docker Compose"
+      shell: |
+        curl -L "https://github.com/docker/compose/releases/download/v{{ docker_compose_version }}/docker-compose-$(uname -s)-$(uname -m)" -o /usr/local/bin/docker-compose
+        chmod +x /usr/local/bin/docker-compose
+      args:
+        creates: /usr/local/bin/docker-compose
+
+    - name: "Create Resilience Forge directories"
+      file:
+        path: "/opt/resilience-forge/{{ item }}"
+        state: directory
+        recurse: yes
+      loop:
+        - logs
+        - backups
+        - config
+
+    - name: "Clone Resilience Forge repository"
+      git:
+        repo: "https://github.com/yourusername/resilience-forge.git"
+        dest: "/opt/resilience-forge"
+        version: main
+
+    - name: "Copy environment configuration"
+      template:
+        src: ".env.j2"
+        dest: "/opt/resilience-forge/.env"
+      notify: restart resilience forge
+
+    - name: "Start services with Docker Compose"
+      docker_compose:
+        project_src: "/opt/resilience-forge"
+        state: present
+        pull: yes
+      environment:
+        COMPOSE_IGNORE_ORPHANS: "true"
+
+    - name: "Wait for services to be healthy"
+      uri:
+        url: "http://localhost:8000/health"
+        status_code: 200
+      register: result
+      until: result.status == 200
+      retries: 30
+      delay: 10
+
+    - name: "Initialize MinIO buckets"
+      shell: |
+        docker exec $(docker ps -q -f "ancestor=minio/minio") \
+        aws s3api create-bucket \
+        --bucket immutable-logs \
+        --endpoint-url http://localhost:9000 \
+        --access-key minioadmin \
+        --secret-key minioadmin
+      ignore_errors: yes
+
+    - name: "Enable object lock on buckets"
+      shell: |
+        docker exec $(docker ps -q -f "ancestor=minio/minio") \
+        aws s3api put-object-lock-configuration \
+        --bucket immutable-logs \
+        --object-lock-configuration ObjectLockEnabled=Enabled \
+        --endpoint-url http://localhost:9000 \
+        --access-key minioadmin \
+        --secret-key minioadmin
+      ignore_errors: yes
+
+  handlers:
+    - name: "restart resilience forge"
+      command: docker-compose restart
+      args:
+        chdir: "/opt/resilience-forge"
+
+  post_tasks:
+    - name: "Display deployment summary"
+      debug:
+        msg: |
+          Resilience Forge deployed successfully!
+          Dashboard: http://{{ ansible_host }}:3000
+          API: http://{{ ansible_host }}:8000
+          MinIO Console: http://{{ ansible_host }}:9001
+          Prometheus: http://{{ ansible_host }}:9090
+          Grafana: http://{{ ansible_host }}:3000

@@ -1,0 +1,52 @@
+rules:
+  - id: logging_no_unlogged_file_operations
+    patterns:
+      - pattern-either:
+          - pattern: |
+              $RESULT = ...
+              $FILE.write(...)
+              ...
+              # No log call before or after write
+          - pattern: |
+              import os
+              ...
+              os.rename(...)
+              # No log call for file rename
+          - pattern: |
+              import shutil
+              ...
+              shutil.copytree(...)
+              # No log call for bulk file copy
+    
+    message: |
+      File operation detected without logging. All file modifications must be logged to immutable storage (MinIO) for forensic preservation.
+      
+      ✅ CORRECT:
+      ```python
+      logger.info(f"Writing file: {path}", extra={
+          "file_path": path,
+          "operation": "write",
+          "user": user,
+          "timestamp": time.time()
+      })
+      file.write(data)
+      minio_client.put_object("audit-logs", f"{incident_id}/file_operations.log", log_entry)
+      ```
+      
+      ❌ WRONG:
+      ```python
+      file.write(data)  # No logging!
+      ```
+    
+    languages: [python]
+    severity: ERROR
+    category: security
+    cwe:
+      - CWE-778  # Insufficient Logging
+    owasp:
+      - A09:2021  # Security Logging and Monitoring Failures
+    metadata:
+      drra-component: shield
+      resilience-requirement: immutable-audit-trail
+      references:
+        - https://docs.resilience-forge.com/shield/forensics/logging-requirements

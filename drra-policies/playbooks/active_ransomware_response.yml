@@ -1,0 +1,168 @@
+stages:
+  - name: "Detect & Alert"
+    duration_target_ms: 500
+    actions:
+      - detect_ransomware_behavior:
+          rules:
+            - ransomware_mass_modification.yml
+            - ransomware_entropy_spike.yml
+            - ransomware_vss_abuse.yml
+          confidence_threshold: 0.85
+      - create_incident:
+          severity: critical
+          source: sentinel_ml_engine
+      - alert_soc_team:
+          channels:
+            - slack
+            - pagerduty
+            - email
+          message_format: incident_summary
+      
+  - name: "Evidence Preservation"
+    duration_target_ms: 5000
+    actions:
+      - trigger_forensic_snapshot:
+          destination: minio_forensic_bucket
+          immutable: true
+          object_lock_enabled: true
+          legal_hold: true
+      - capture_process_tree:
+          pid: "{{ incident.malware_process_id }}"
+          depth: 5
+      - collect_network_connections:
+          process_id: "{{ incident.malware_process_id }}"
+          include_dns: true
+      - preserve_auth_logs:
+          hours_back: 2
+
+  - name: "Network Isolation"
+    duration_target_ms: 2500
+    requires_approval: false  # Can be changed to true for high-security profile
+    actions:
+      - validate_isolation_policy:
+          policy_file: isolation_vlan_rules.rego
+          incident: "{{ incident }}"
+      - isolate_vlan:
+          target_vlan: QUARANTINE_10
+          affected_hosts: "{{ incident.affected_hosts }}"
+      - revoke_active_sessions:
+          user_id: "{{ incident.compromised_user }}"
+          revoke_all_tokens: true
+      - block_registry_modifications:
+          hives:
+            - HKLM\Software
+            - HKLM\System
+
+  - name: "Credential Management"
+    duration_target_ms: 30000
+    actions:
+      - identify_lateral_movement_accounts:
+          incident: "{{ incident }}"
+      - reset_compromised_passwords:
+          accounts: "{{ compromised_accounts }}"
+          require_mfa: true
+      - create_incident_service_account:
+          purpose: recovery_operations
+          permissions: read_only
+          ttl_minutes: 120
+
+  - name: "Recovery Planning"
+    duration_target_ms: 10000
+    actions:
+      - analyze_recovery_options:
+          incident: "{{ incident }}"
+          available_snapshots: "{{ snapshots }}"
+      - validate_snapshot_integrity:
+          policy_file: recovery_snapshot_validation.rego
+          snapshot_id: "{{ selected_snapshot }}"
+      - select_recovery_strategy:
+          strategies: [snapshot_restore, incremental_restore, full_rebuild]
+          recommended: snapshot_restore
+      - estimate_recovery_time:
+          strategy: "{{ recovery_strategy }}"
+          data_volume_gb: "{{ data_volume }}"
+
+  - name: "Data Recovery"
+    duration_target_ms: 1800000  # 30 minutes target
+    actions:
+      - start_recovery_task:
+          strategy: "{{ recovery_strategy }}"
+          parallel_threads: 8
+          checkpoint_interval: 100MB
+      - validate_recovery_progress:
+          check_interval_ms: 5000
+          error_threshold: 3
+      - perform_data_integrity_checks:
+          methods: [md5_hash_validation, file_count_verification]
+      - notify_recovery_progress:
+          frequency: every_5_minutes
+
+  - name: "Post-Recovery Validation"
+    duration_target_ms: 300000  # 5 minutes
+    actions:
+      - golden_image_validation:
+          check_binary_integrity: true
+          check_config_consistency: true
+          policy_file: golden_image_validation.yml
+      - malware_rescan:
+          scanner: windows_defender
+          definitions_age_max_hours: 1
+      - network_connectivity_test:
+          test_urls:
+            - https://microsoft.com
+            - https://google.com
+      - service_health_check:
+          services: [AD, DNS, File Shares]
+
+  - name: "Post-Incident Hardening"
+    duration_target_ms: 3600000  # 1 hour
+    actions:
+      - apply_hardening_profile:
+          profile: default
+          rules_file: post_incident_hardening.yml
+      - update_ransomware_signatures:
+          edr: windows_defender
+          av: windows_defender
+      - enforce_lateral_movement_prevention:
+          policy_file: lateral_movement_prevention.rego
+      - rebaseline_fim:
+          file_integrity_monitoring: enabled
+          baselines: ["C:\\Windows", "C:\\Program Files"]
+      - apply_critical_patches:
+          severity: critical
+          require_approval: false
+      - enforce_mfa_everywhere:
+          mfa_provider: azure_ad
+
+  - name: "Forensic Handoff"
+    duration_target_ms: 60000
+    actions:
+      - generate_forensic_report:
+          include_timeline: true
+          include_indicators: true
+          include_root_cause: true
+      - seal_evidence:
+          object_lock_legal_hold: true
+          retention_days: 365
+          access_log_enabled: true
+      - export_to_siem:
+          siem: splunk
+          dataset: incident_artifacts
+      - notify_stakeholders:
+          recipients:
+          - security_team@company.com
+          - executive_sponsor@company.com
+          attachment: incident_summary.pdf
+
+metadata:
+  name: Active Ransomware Response
+  description: End-to-end response to active ransomware attack
+  author: Resilience Forge Team
+  version: 1.0.0
+  estimated_total_time_minutes: 60
+  approval_required: false
+  auto_execute: true
+  target_frameworks:
+    - NIST_CSF_RS
+    - SOC2_CC9
+    - CIS_23
