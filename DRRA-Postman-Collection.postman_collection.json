@@ -1,0 +1,464 @@
+{
+  "info": {
+    "_postman_id": "drra-collection-2026",
+    "name": "Resilience Forge (DRRA) - API Collection",
+    "description": "Complete API test collection for Damn Resilient Ransomware App",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health & Status",
+      "item": [
+        {
+          "name": "System Health Check",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": ["{{base_url}}"],
+              "path": ["health"]
+            },
+            "description": "Check if API is running"
+          },
+          "response": []
+        },
+        {
+          "name": "Readiness Probe",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/ready",
+              "host": ["{{base_url}}"],
+              "path": ["ready"]
+            },
+            "description": "Kubernetes readiness probe"
+          },
+          "response": []
+        },
+        {
+          "name": "Dashboard Summary",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/v1/dashboard/summary",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "dashboard", "summary"]
+            },
+            "description": "Get overall system metrics and defensibility index"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "THE FORGE - Simulation & Testing",
+      "item": [
+        {
+          "name": "Deploy Honeypot",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"First Test Honeypot\",\n  \"payload_type\": \"honeypot\",\n  \"target_path\": \"C:\\\\test\",\n  \"duration_seconds\": 60\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/forge/deploy",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "forge", "deploy"]
+            },
+            "description": "Deploy a honeypot simulation at specified path"
+          },
+          "response": []
+        },
+        {
+          "name": "Generate Honeypot Files",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"file_types\": [\"pdf\", \"docx\", \"xlsx\"],\n  \"count\": 50,\n  \"size_mb\": 1.0\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/forge/honeypot/generate",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "forge", "honeypot", "generate"]
+            },
+            "description": "Generate realistic honeypot files (PDFs, documents, spreadsheets)"
+          },
+          "response": []
+        },
+        {
+          "name": "Test Lateral Movement (Kerberos)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"source_host\": \"workstation_001\",\n  \"target_host\": \"file_server_01\",\n  \"attack_type\": \"kerberos_delegation\",\n  \"duration_seconds\": 30\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/forge/identity-squat/kerberos-test",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "forge", "identity-squat", "kerberos-test"]
+            },
+            "description": "Simulate Kerberos-based lateral movement attack"
+          },
+          "response": []
+        },
+        {
+          "name": "List Active Payloads",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/v1/forge/payloads",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "forge", "payloads"]
+            },
+            "description": "List all active simulation payloads"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "SENTINEL - Detection & Auditing",
+      "item": [
+        {
+          "name": "Record Detection Event",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event_id\": \"test_evt_001\",\n  \"timestamp\": \"2026-03-19T10:00:00Z\",\n  \"threat_type\": \"mass_modification\",\n  \"threat_level\": \"high\",\n  \"affected_path\": \"C:\\\\test\",\n  \"file_count\": 5000,\n  \"entropy_score\": 0.87,\n  \"confidence\": 0.94,\n  \"details\": {\n    \"modified_files\": [\"file1.pdf\", \"file2.docx\"],\n    \"vss_detected\": false,\n    \"lateral_movement\": false\n  }\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/sentinel/events",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "sentinel", "events"]
+            },
+            "description": "Record a threat detection event (mass file modification, encryption attempt)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get All Events",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/v1/sentinel/events",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "sentinel", "events"]
+            },
+            "description": "Retrieve all recorded detection events"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Telemetry",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/v1/sentinel/telemetry",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "sentinel", "telemetry"]
+            },
+            "description": "Get immutable telemetry logs from MinIO"
+          },
+          "response": []
+        },
+        {
+          "name": "Analyze for Threats",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"path\": \"C:\\\\test\",\n  \"process_id\": 1234,\n  \"duration_seconds\": 60\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/sentinel/behaviors/analyze",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "sentinel", "behaviors", "analyze"]
+            },
+            "description": "Scan a directory for behavioral threat indicators (was: /sentinel/analyze — FIXED)"
+          },
+          "response": []
+        },
+        {
+          "name": "Generate LLM Insight (Gemini)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"event_id\": \"test_evt_001\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/sentinel/insights/generate",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "sentinel", "insights", "generate"]
+            },
+            "description": "Generate Gemini LLM plain-English attack summary and recommendations"
+          },
+          "response": []
+        },
+        {
+          "name": "Sentinel Status",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/v1/sentinel/status",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "sentinel", "status"]
+            },
+            "description": "Get Sentinel detection engine status"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "THE SHIELD - Recovery & Isolation",
+      "item": [
+        {
+          "name": "Isolate Resource (VLAN)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"resource_id\": \"workstation_001\",\n  \"action\": \"vlan_isolate\",\n  \"reason\": \"test_simulation\",\n  \"preserve_logs\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/shield/isolate",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "shield", "isolate"]
+            },
+            "description": "Isolate an infected resource via VLAN micro-segmentation"
+          },
+          "response": []
+        },
+        {
+          "name": "Activate Object Lock",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"bucket\": \"immutable-logs\",\n  \"retention_days\": 365,\n  \"legal_hold\": true\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/shield/object-lock/activate",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "shield", "object-lock", "activate"]
+            },
+            "description": "Activate write-once object locking for immutable storage (was: /shield/activate-lock — FIXED)"
+          },
+          "response": []
+        },
+        {
+          "name": "Start Recovery",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"recovery_type\": \"restore_snapshot\",\n  \"priority\": 1\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/shield/recovery/create",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "shield", "recovery", "create"]
+            },
+            "description": "Initiate automated recovery from snapshot (was: /shield/recover — FIXED)"
+          },
+          "response": []
+        },
+        {
+          "name": "List Recovery Tasks",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/v1/shield/recovery",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "shield", "recovery"]
+            },
+            "description": "List all recovery tasks and their status"
+          },
+          "response": []
+        },
+        {
+          "name": "Preserve Forensic Evidence",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"incident_id\": \"INC-20260319-001\",\n  \"retention_days\": 90\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/shield/forensics/preserve",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "shield", "forensics", "preserve"]
+            },
+            "description": "Archive forensic artifacts to immutable MinIO storage (was: GET forensics — FIXED to POST preserve)"
+          },
+          "response": []
+        },
+        {
+          "name": "Shield Status",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/v1/shield/status",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "shield", "status"]
+            },
+            "description": "Get Shield isolation and recovery engine status"
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "DASHBOARD - Monitoring & Control",
+      "item": [
+        {
+          "name": "Get Defensibility Index",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/v1/dashboard/defensibility-index",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "dashboard", "defensibility-index"]
+            },
+            "description": "Get Defensibility Index score (0-100) (was: /metrics/defensibility — FIXED)"
+          },
+          "response": []
+        },
+        {
+          "name": "Get MTTC Metrics",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/v1/dashboard/metrics/mttc",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "dashboard", "metrics", "mttc"]
+            },
+            "description": "Get Mean Time to Contain metrics"
+          },
+          "response": []
+        },
+        {
+          "name": "Get Incidents",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/v1/dashboard/incidents",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "dashboard", "incidents"]
+            },
+            "description": "Get list of all incidents"
+          },
+          "response": []
+        },
+        {
+          "name": "View Configuration",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/v1/dashboard/config",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "dashboard", "config"]
+            },
+            "description": "Get current system configuration and thresholds"
+          },
+          "response": []
+        },
+        {
+          "name": "Update Detection Thresholds",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mass_modification_threshold\": 0.10,\n  \"entropy_threshold\": 0.85,\n  \"sensitivity_level\": \"balanced\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/dashboard/config/thresholds",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "dashboard", "config", "thresholds"]
+            },
+            "description": "Update detection sensitivity settings (strict/balanced/permissive)"
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8000",
+      "type": "string"
+    }
+  ]
+}
