@@ -18,6 +18,9 @@ from routes import (
     dashboard_router,
     health_router
 )
+from db.session import init_db
+from utils.kafka_publisher import kafka_publisher
+from utils.minio_client import minio_client
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -27,9 +30,23 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """Application lifespan event handler."""
     logger.info("🔥 Resilience Forge starting up...")
-    # Initialize services
+    
+    # Initialize database tables
+    try:
+        init_db()
+        logger.info("✅ Database initialized")
+    except Exception as e:
+        logger.error(f"❌ Failed to initialize database: {e}")
+    
+    # Verify integrations
+    logger.info(f"✅ MinIO client ready: {minio_client.client is not None}")
+    logger.info(f"✅ Kafka producer ready: {kafka_publisher.producer is not None}")
+    
     yield
+    
     logger.info("🛡️ Resilience Forge shutting down...")
+    # Close Kafka producer
+    kafka_publisher.close()
 
 # Create FastAPI application
 app = FastAPI(
