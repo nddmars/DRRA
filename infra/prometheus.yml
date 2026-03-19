@@ -1,6 +1,4 @@
-"""
-Prometheus metrics configuration
-"""
+# Prometheus metrics configuration
 
 global:
   scrape_interval: 15s
