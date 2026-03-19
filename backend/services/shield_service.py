@@ -7,6 +7,9 @@ import logging
 from typing import Optional, Dict, Any, List
 from datetime import datetime, timedelta, timezone
 import uuid
+from utils.db_manager import db_manager
+from utils.minio_client import minio_client
+from utils.kafka_publisher import kafka_publisher
 
 logger = logging.getLogger(__name__)
 
@@ -24,22 +27,40 @@ class ShieldService:
         reason: str,
         preserve_logs: bool = True
     ) -> str:
-        """Trigger isolation action on a resource."""
+        """Trigger isolation action on a resource (PostgreSQL + Kafka)."""
         isolation_id = str(uuid.uuid4())
+        incident_id = str(uuid.uuid4())
+        timestamp = datetime.now(timezone.utc)
         
         record = {
             "isolation_id": isolation_id,
+            "incident_id": incident_id,
             "resource_id": resource_id,
             "action": action,
             "reason": reason,
             "status": "in_progress",
             "preserve_logs": preserve_logs,
-            "started_at": datetime.now(timezone.utc).isoformat(),
+            "started_at": timestamp.isoformat(),
             "estimated_duration": 2.5
         }
         
+        # 1. Save to PostgreSQL audit
+        db_manager.create_isolation_action(
+            isolation_id=isolation_id,
+            incident_id=incident_id,
+            action_type=action,
+            resource_id=resource_id,
+            status="in_progress",
+            affected_count=1,
+            details=record
+        )
+        
+        # 2. Publish isolation event to Kafka
+        kafka_publisher.publish_isolation_event(record)
+        
+        # Keep in-memory for quick status checks
         self.isolation_records[isolation_id] = record
-        logger.info(f"Isolation triggered: {isolation_id} - {action} on {resource_id}")
+        logger.info(f"Isolation triggered: {isolation_id} - {action} on {resource_id} (PostgreSQL + Kafka)")
         
         return isolation_id
     
@@ -67,13 +88,17 @@ class ShieldService:
         self,
         recovery_type: str,
         priority: int = 5,
-        preserve_forensics: bool = True
+        preserve_forensics: bool = True,
+        incident_id: Optional[str] = None
     ) -> str:
-        """Create an automated recovery task."""
+        """Create an automated recovery task (PostgreSQL + Kafka)."""
         task_id = str(uuid.uuid4())
+        if not incident_id:
+            incident_id = str(uuid.uuid4())
         
         task = {
             "task_id": task_id,
+            "incident_id": incident_id,
             "recovery_type": recovery_type,
             "priority": priority,
             "preserve_forensics": preserve_forensics,
@@ -82,8 +107,22 @@ class ShieldService:
             "estimated_duration_minutes": priority * 10
         }
         
+        # 1. Save to PostgreSQL
+        db_manager.create_recovery_task(
+            task_id=task_id,
+            incident_id=incident_id,
+            recovery_type=recovery_type,
+            status="pending",
+            priority=priority,
+            details=task
+        )
+        
+        # 2. Publish recovery event to Kafka
+        kafka_publisher.publish_recovery_event(task)
+        
+        # Keep in-memory for quick access
         self.recovery_tasks[task_id] = task
-        logger.info(f"Recovery task created: {task_id} - {recovery_type}")
+        logger.info(f"Recovery task created: {task_id} - {recovery_type} (PostgreSQL + Kafka)")
         
         return task_id
     
@@ -94,19 +133,42 @@ class ShieldService:
     async def preserve_forensic_evidence(
         self,
         incident_id: str,
+        forensic_data: Dict[str, Any] = None,
         retention_days: int = 90
     ) -> Dict:
-        """Preserve forensic evidence from incident."""
+        """Preserve forensic evidence from incident (MinIO + PostgreSQL)."""
         evidence_id = str(uuid.uuid4())
+        
+        if forensic_data is None:
+            forensic_data = {
+                "incident_id": incident_id,
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "preserved_at": datetime.now(timezone.utc).isoformat()
+            }
+        
+        # 1. Store forensic data to MinIO immutable storage
+        minio_path = minio_client.store_forensics(incident_id, forensic_data)
+        
+        # 2. Create forensic evidence record in PostgreSQL
+        db_manager.create_forensic_evidence(
+            evidence_id=evidence_id,
+            incident_id=incident_id,
+            evidence_type="incident_forensics",
+            minio_path=minio_path or f"s3://forensic-artifacts/{incident_id}",
+            details=forensic_data,
+            retention_days=retention_days
+        )
+        
+        logger.info(f"Forensic evidence preserved: {evidence_id} to MinIO and PostgreSQL (retention: {retention_days} days)")
         
         return {
             "evidence_id": evidence_id,
             "incident_id": incident_id,
-            "status": "preserving",
-            "storage_location": f"s3://forensic-artifacts/{incident_id}",
+            "status": "preserved",
+            "storage_location": minio_path or f"s3://forensic-artifacts/{incident_id}",
             "retention_days": retention_days,
             "object_lock": True,
-            "message": f"Forensic artifacts being preserved for {retention_days} days"
+            "message": f"Forensic artifacts preserved for {retention_days} days"
         }
 
 

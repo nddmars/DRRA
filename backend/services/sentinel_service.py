@@ -10,6 +10,9 @@ import uuid
 import math
 from collections import defaultdict
 import os
+from utils.db_manager import db_manager
+from utils.minio_client import minio_client
+from utils.kafka_publisher import kafka_publisher
 
 logger = logging.getLogger(__name__)
 
@@ -134,12 +137,13 @@ class SentinelService:
         confidence: float,
         details: Dict[str, Any]
     ) -> str:
-        """Record a detection event."""
+        """Record a detection event to PostgreSQL, MinIO, and Kafka."""
         event_id = str(uuid.uuid4())
+        timestamp = datetime.now(timezone.utc)
         
         event = {
             "event_id": event_id,
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": timestamp.isoformat(),
             "threat_type": threat_type,
             "threat_level": threat_level,
             "affected_path": affected_path,
@@ -149,8 +153,39 @@ class SentinelService:
             "details": details
         }
         
+        # 1. Save to PostgreSQL audit log
+        db_manager.create_detection_event(
+            event_id=event_id,
+            timestamp=timestamp,
+            threat_type=threat_type,
+            threat_level=threat_level,
+            affected_path=affected_path,
+            file_count=file_count,
+            entropy_score=entropy_score,
+            confidence=confidence,
+            details=details
+        )
+        
+        # 2. Publish to Kafka for event streaming
+        kafka_publisher.publish_threat_event(event)
+        
+        # 3. Store telemetry to MinIO for immutable archival
+        minio_object_key = minio_client.store_telemetry(event_id, event)
+        
+        # 4. Create telemetry record with MinIO reference
+        if minio_object_key:
+            db_manager.create_telemetry_event(
+                event_id=event_id,
+                source="sentinel",
+                event_type=threat_type,
+                severity=threat_level,
+                data=event,
+                minio_object_key=minio_object_key
+            )
+        
+        # Keep in-memory for quick access
         self.detection_events[event_id] = event
-        logger.info(f"Detection event recorded: {event_id} - {threat_level}")
+        logger.info(f"Detection event recorded: {event_id} - {threat_level} (PostgreSQL + Kafka + MinIO)")
         
         return event_id
     
@@ -308,12 +343,32 @@ class TelemetryService:
         return event["event_id"]
     
     async def flush_to_immutable_storage(self) -> int:
-        """Flush telemetry buffer to MinIO immutable storage."""
+        """Flush telemetry buffer to MinIO immutable storage and PostgreSQL."""
         count = len(self.telemetry_buffer)
         
-        # In production, write to MinIO here
-        logger.info(f"Flushing {count} telemetry events to immutable storage")
+        for event in self.telemetry_buffer:
+            # Store to MinIO for immutable archival
+            minio_object_key = minio_client.store_telemetry(
+                event["event_id"],
+                event,
+                retention_days=365
+            )
+            
+            # Persist to PostgreSQL with MinIO reference
+            db_manager.create_telemetry_event(
+                event_id=event["event_id"],
+                source=event.get("source", "sentinel"),
+                event_type=event.get("event_type", "telemetry"),
+                severity=event.get("severity", "info"),
+                data=event,
+                minio_object_key=minio_object_key,
+                retention_days=365
+            )
+            
+            # Publish to Kafka
+            kafka_publisher.publish_telemetry(event)
         
+        logger.info(f"Flushed {count} telemetry events to MinIO (immutable) and PostgreSQL")
         self.telemetry_buffer.clear()
         return count
     
