@@ -183,20 +183,20 @@ CODE_FLOW_WALKTHROUGH.md
   → "Step 1️⃣: Attack Simulation (FORGE)"
 ```
 
-### I want to test SENTINEL (Detection)
+### I want to test VIGIL (Detection)
 
 ```
 QUICK_REFERENCE.md
   ↓
 "# Test by Component"
-  → "# SENTINEL (Detection)"
+  → "# VIGIL (Detection)"
   ↓
 Copy the command:
-$env:PYTHONPATH = "."; pytest tests/test_services.py::TestSentinelService -v
+$env:PYTHONPATH = "."; pytest tests/test_services.py::TestVgilService -v
 
 Then read:
 CODE_FLOW_WALKTHROUGH.md
-  → "Step 3️⃣: Threat Detection (SENTINEL)"
+  → "Step 3️⃣: Threat Detection (VIGIL)"
 ```
 
 ### I want to test SHIELD (Recovery)
@@ -249,8 +249,8 @@ $env:PYTHONPATH = "."; pytest tests/test_services.py::TestBehaviorPatternDetecto
 # Forge Service
 $env:PYTHONPATH = "."; pytest tests/test_services.py::TestForgeService -v
 
-# Sentinel Service
-$env:PYTHONPATH = "."; pytest tests/test_services.py::TestSentinelService -v
+# Vigil Service
+$env:PYTHONPATH = "."; pytest tests/test_services.py::TestVgilService -v
 
 # Shield Service
 $env:PYTHONPATH = "."; pytest tests/test_services.py::TestShieldService -v

@@ -51,9 +51,9 @@ report_interval_secs = 5
 api_endpoint = "http://localhost:8000"
 ```
 
-## Integration with Sentinel
+## Integration with Vigil
 
-File watcher streams events to Sentinel ML engine via:
+File watcher streams events to Vigil ML engine via:
 1. REST API polling
 2. Kafka topics (preferred)
 3. Direct in-process callbacks

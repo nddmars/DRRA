@@ -19,7 +19,7 @@ sources:
       - "localhost:9092"
     topics:
       - resilience_events
-      - sentinel_detections
+      - vigil_detections
       - shield_actions
     group_id: vector_consumer
 

@@ -8,7 +8,7 @@ import pytest
 import asyncio
 from datetime import datetime
 from backend.services.forge_service import ForgeService, HoneypotGenerator, PayloadSimulator
-from backend.services.sentinel_service import SentinelService, BehaviorPatternDetector, TelemetryService
+from backend.services.vigil_service import VgilService, BehaviorPatternDetector, TelemetryService
 from backend.services.shield_service import ShieldService, MicroSegmentationService, RecoveryOrchestrator
 
 
@@ -119,17 +119,17 @@ class TestPayloadSimulator:
 # SENTINEL SERVICE TESTS
 # ============================================
 
-class TestSentinelService:
-    """Test suite for Sentinel detection engine."""
+class TestVgilService:
+    """Test suite for Vigil detection service."""
     
     @pytest.fixture
-    def sentinel_service(self):
-        return SentinelService()
+    def vigil_service(self):
+        return VgilService()
     
     @pytest.mark.asyncio
-    async def test_record_detection_event(self, sentinel_service):
+    async def test_record_detection_event(self, vigil_service):
         """Test event recording."""
-        event_id = await sentinel_service.record_detection_event(
+        event_id = await vigil_service.record_detection_event(
             threat_type="mass_modification",
             threat_level="critical",
             affected_path="/home/user/docs",
@@ -143,9 +143,9 @@ class TestSentinelService:
         assert len(event_id) > 0
     
     @pytest.mark.asyncio
-    async def test_get_recent_events(self, sentinel_service):
+    async def test_get_recent_events(self, vigil_service):
         """Test retrieving recent events."""
-        await sentinel_service.record_detection_event(
+        await vigil_service.record_detection_event(
             threat_type="encryption_detected",
             threat_level="high",
             affected_path="/var/data",
@@ -155,15 +155,15 @@ class TestSentinelService:
             details={}
         )
         
-        events = await sentinel_service.get_recent_events(limit=10)
+        events = await vigil_service.get_recent_events(limit=10)
         
         assert isinstance(events, list)
         assert len(events) > 0
     
     @pytest.mark.asyncio
-    async def test_analyze_path_for_threats(self, sentinel_service):
+    async def test_analyze_path_for_threats(self, vigil_service):
         """Test threat analysis on a path."""
-        analysis = await sentinel_service.analyze_path_for_threats(
+        analysis = await vigil_service.analyze_path_for_threats(
             path="/tmp",
             duration_seconds=60
         )
@@ -173,9 +173,9 @@ class TestSentinelService:
         assert 'patterns_detected' in analysis
     
     @pytest.mark.asyncio
-    async def test_generate_llm_insight(self, sentinel_service):
+    async def test_generate_llm_insight(self, vigil_service):
         """Test LLM insight generation."""
-        event_id = await sentinel_service.record_detection_event(
+        event_id = await vigil_service.record_detection_event(
             threat_type="mass_modification",
             threat_level="critical",
             affected_path="/home",
@@ -185,7 +185,7 @@ class TestSentinelService:
             details={}
         )
         
-        insight = await sentinel_service.generate_llm_insight(event_id)
+        insight = await vigil_service.generate_llm_insight(event_id)
         
         assert 'insight_id' in insight
         assert 'threat_summary' in insight
@@ -406,7 +406,7 @@ class TestIntegration:
     def services(self):
         return {
             'forge': ForgeService(),
-            'sentinel': SentinelService(),
+            'vigil': VgilService(),
             'shield': ShieldService()
         }
     
@@ -418,7 +418,7 @@ class TestIntegration:
         2. Detect threat via Sentinel
         3. Isolate and recover via Shield
         """
-        forge, sentinel, shield = services['forge'], services['sentinel'], services['shield']
+        forge, vigil, shield = services['forge'], services['vigil'], services['shield']
         
         # 1. Deploy payload
         payload_id = await forge.deploy_payload(
@@ -431,7 +431,7 @@ class TestIntegration:
         assert payload_id is not None
         
         # 2. Record threat detection
-        event_id = await sentinel.record_detection_event(
+        event_id = await vigil.record_detection_event(
             threat_type="mass_modification",
             threat_level="critical",
             affected_path="/tmp/test",

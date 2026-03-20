@@ -13,7 +13,7 @@ from contextlib import asynccontextmanager
 from config import settings
 from routes import (
     forge_router,
-    sentinel_router,
+    vigil_router,
     shield_router,
     dashboard_router,
     health_router
@@ -68,7 +68,7 @@ app.add_middleware(
 # Include routers
 app.include_router(health_router.router, tags=["Health"])
 app.include_router(forge_router.router, prefix="/api/v1/forge", tags=["Forge Trigger"])
-app.include_router(sentinel_router.router, prefix="/api/v1/sentinel", tags=["Sentinel Detection"])
+app.include_router(vigil_router.router, prefix="/api/v1/vigil", tags=["Vigil Detection"])
 app.include_router(shield_router.router, prefix="/api/v1/shield", tags=["Shield Recovery"])
 app.include_router(dashboard_router.router, prefix="/api/v1/dashboard", tags=["Dashboard"])
 

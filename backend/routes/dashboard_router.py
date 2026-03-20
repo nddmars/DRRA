@@ -47,7 +47,7 @@ async def get_dashboard_summary():
         status="healthy",
         components={
             "forge": "healthy",
-            "sentinel": "healthy",
+            "vigil": "healthy",
             "shield": "operational",
             "storage": "healthy",
             "messaging": "healthy"

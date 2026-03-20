@@ -1,5 +1,5 @@
 """
-Service layer for Sentinel (Detection) operations.
+Service layer for Vigil (Detection) operations.
 Handles ML detection, telemetry, and LLM integration with entropy analysis and behavioral patterns.
 """
 
@@ -120,7 +120,7 @@ class BehaviorPatternDetector:
         return None
 
 
-class SentinelService:
+class VgilService:
     """Service for detection and threat analysis."""
     
     def __init__(self):
@@ -176,7 +176,7 @@ class SentinelService:
         if minio_object_key:
             db_manager.create_telemetry_event(
                 event_id=event_id,
-                source="sentinel",
+                source="vigil",
                 event_type=threat_type,
                 severity=threat_level,
                 data=event,
@@ -357,7 +357,7 @@ class TelemetryService:
             # Persist to PostgreSQL with MinIO reference
             db_manager.create_telemetry_event(
                 event_id=event["event_id"],
-                source=event.get("source", "sentinel"),
+                source=event.get("source", "vigil"),
                 event_type=event.get("event_type", "telemetry"),
                 severity=event.get("severity", "info"),
                 data=event,
@@ -387,13 +387,13 @@ class TelemetryService:
 if __name__ == "__main__":
     import asyncio
     
-    sentinel = SentinelService()
+    vigil = VgilService()
     telemetry = TelemetryService()
     
     # Example usage
     async def test():
         # Record event
-        event_id = await sentinel.record_detection_event(
+        event_id = await vigil.record_detection_event(
             threat_type="mass_modification",
             threat_level="high",
             affected_path="C:\\Users\\Documents",

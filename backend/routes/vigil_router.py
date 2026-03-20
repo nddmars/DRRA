@@ -1,5 +1,5 @@
 """
-Route handler for The Sentinel (detection and auditing).
+Route handler for Vigil (detection and auditing).
 FR-2: AI-Integrated Detection, Behavioral Intelligence, Immutable Telemetry, LLM Insights
 """
 
@@ -173,8 +173,8 @@ async def get_llm_insight(insight_id: str):
     }
 
 @router.get("/status")
-async def sentinel_status():
-    """Check Sentinel operational status."""
+async def vigil_status():
+    """Check Vigil operational status."""
     return {
         "status": "operational",
         "components": {
