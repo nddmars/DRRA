@@ -40,13 +40,13 @@ class TestForge:
         assert response.json()["status"] == "generated"
 
 
-class TestSentinel:
-    """Test The Sentinel (Detection & Auditing)"""
+class TestVigil:
+    """Test Vigil (Detection & Auditing)"""
     
     async def test_detection_event_recording(self, client: AsyncClient):
         """Test recording detection events."""
         response = await client.post(
-            "/api/v1/sentinel/events",
+            "/api/v1/vigil/events",
             json={
                 "event_id": "test_evt_001",
                 "timestamp": "2024-02-19T10:00:00Z",
@@ -64,7 +64,7 @@ class TestSentinel:
     async def test_behavior_analysis(self, client: AsyncClient):
         """Test behavioral pattern analysis."""
         response = await client.post(
-            "/api/v1/sentinel/behaviors/analyze",
+            "/api/v1/vigil/behaviors/analyze",
             params={
                 "path": "C:\\\\Documents",
                 "process_id": 1234,
@@ -76,7 +76,7 @@ class TestSentinel:
     
     async def test_immutable_telemetry(self, client: AsyncClient):
         """Test immutable telemetry retrieval."""
-        response = await client.get("/api/v1/sentinel/telemetry")
+        response = await client.get("/api/v1/vigil/telemetry")
         assert response.status_code == 200
         assert response.json()["telemetry_immutable"] == True
 
@@ -179,7 +179,7 @@ class TestGauntletScenarios:
         
         # Simulate detection event
         detection = await client.post(
-            "/api/v1/sentinel/events",
+            "/api/v1/vigil/events",
             json={
                 "event_id": f"test_{payload_id}",
                 "timestamp": "2024-02-19T10:00:00Z",
@@ -248,7 +248,7 @@ class TestGauntletScenarios:
         """
         Verify ransomware cannot tamper with immutable logs.
         """
-        telemetry = await client.get("/api/v1/sentinel/telemetry")
+        telemetry = await client.get("/api/v1/vigil/telemetry")
         data = telemetry.json()
         assert data["telemetry_immutable"] == True
         assert data["object_lock_enabled"] == True

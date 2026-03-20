@@ -66,18 +66,18 @@ File Watcher is monitoring /tmp/honeypot
   }
 
 📤 Sends to Backend:
-  POST /api/v1/sentinel/events
+  POST /api/v1/vigil/events
 ```
 
 ---
 
-## Step 3️⃣: Threat Detection (SENTINEL - THE CORE)
+## Step 3️⃣: Threat Detection (VIGIL - THE CORE)
 
-**File**: `backend/services/sentinel_service.py`
+**File**: `backend/services/vigil_service.py`
 
 ### Part A: Pattern Recognition
 ```python
-# Sentinel receives event from watcher
+# Vigil receives event from watcher
 event = {
     "file_path": "/tmp/honeypot",
     "file_count": 523,      #← Alert: 523 files modified
@@ -123,8 +123,8 @@ pattern = detector.detect_lateral_movement(
 
 ### Part B: Event Recording
 ```python
-# Sentinel records threat event
-event_id = await sentinel.record_detection_event(
+# Vigil records threat event
+event_id = await vigil.record_detection_event(
     threat_type="mass_modification",
     threat_level="critical",
     affected_path="/tmp/honeypot",
@@ -143,7 +143,7 @@ event_id = await sentinel.record_detection_event(
 ### Part C: LLM Analysis
 ```python
 # Generate human-readable insights
-insight = await sentinel.generate_llm_insight(event_id)
+insight = await vigil.generate_llm_insight(event_id)
 
 # Returns:
 # {
@@ -280,7 +280,7 @@ task_id = await shield.create_recovery_task(
              │
              ▼
 ┌─────────────────────────┐
-│  3. SENTINEL DETECTS    │
+│  3. VIGIL DETECTS    │
 │  Pattern Recognition:   │
 │  ✓ Mass Modification    │
 │  ✓ Encryption (E=0.89)  │
@@ -436,7 +436,7 @@ python test_flow.py
 | File | Purpose | Key Function |
 |------|---------|--------------|
 | `backend/services/forge_service.py` | Simulate attacks | `deploy_payload()`, `generate_honeypot()` |
-| `backend/services/sentinel_service.py` | Detect threats | `record_detection_event()`, `analyze_path_for_threats()` |
+| `backend/services/vigil_service.py` | Detect threats | `record_detection_event()`, `analyze_path_for_threats()` |
 | `backend/services/shield_service.py` | Respond to threats | `trigger_isolation()`, `create_recovery_task()` |
 | `tests/test_services.py` | Test workflows | `test_end_to_end_threat_detection_and_response()` |
 | `backend/routes/*_router.py` | API endpoints | `@router.post()`, `@router.get()` |

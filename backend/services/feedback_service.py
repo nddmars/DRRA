@@ -244,7 +244,7 @@ class FeedbackLoopService:
       - Adaptive thresholds that self-tune without manual intervention
     """
 
-    # DI pillar weights (matches DefensibilityScorer in sentinel/detector.py)
+    # DI pillar weights (matches DefensibilityScorer in vigil/detector.py)
     DI_WEIGHTS = {
         "detection": 0.30,
         "isolation": 0.30,
@@ -566,5 +566,5 @@ if __name__ == "__main__":
 
     print("\n" + "=" * 65)
     print("  Closed loop complete. Thresholds auto-updated for next cycle.")
-    print("  This output feeds back into sentinel_service.py WALL detection.")
+    print("  This output feeds back into vigil_service.py WALL detection.")
     print("=" * 65)

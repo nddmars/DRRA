@@ -132,7 +132,7 @@ impl FileSystemWatcher {
         
         for event in events {
             client
-                .post(&format!("{}/api/v1/sentinel/events", self.config.backend_url))
+                .post(&format!("{}/api/v1/vigil/events", self.config.backend_url))
                 .json(&event)
                 .send()
                 .await?;
