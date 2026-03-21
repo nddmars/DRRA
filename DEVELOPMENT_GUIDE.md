@@ -1,5 +1,18 @@
 # Resilience Forge Development Guide
 
+## Framework Overview: WALL-SQUAT-GRAB
+
+Resilience Forge (DRRA) is built on three pillars of ransomware defense:
+
+- **WALL 🔵 (PREVENT)**: Vigil detection engine - Identify threats before encryption spreads
+- **SQUAT 🟡 (SURVIVE)**: Shield containment - Rapid automated isolation and network quarantine
+- **GRAB 🔴 (CONTROL)**: Shield recovery - Verified backup restoration with data integrity
+- **FORGE**: Testing framework - Safe simulation of all threat scenarios
+
+**Key Metric**: **Defensibility Index** (0-100, higher is better) combines all three pillars
+
+---
+
 ## Quick Start
 
 ### Prerequisites
@@ -85,7 +98,7 @@ ransomwaredefense/
 ├── backend/                    # FastAPI server
 │   ├── main.py                # App entry point
 │   ├── routes/                # API endpoints
-│   ├── services/              # Business logic (Forge, Sentinel, Shield)
+│   ├── services/              # Business logic (Forge, Vigil, Shield)
 │   ├── models/                # Database & Pydantic models
 │   └── db/                    # Database configuration
 ├── vigil/                     # ML detection module (behavioral analysis)
@@ -133,10 +146,10 @@ POST /api/v1/forge/honeypot/generate
 POST /api/v1/forge/identity-squat/kerberos-test
 ```
 
-### Sentinel (Detection)
+### Vigil (Detection - WALL/PREVENT)
 ```bash
 # Get detection events
-GET /api/v1/sentinel/events?limit=100&threat_level=high
+GET /api/v1/vigil/events?limit=100&threat_level=high
 
 # Record event
 POST /api/v1/vigil/events
