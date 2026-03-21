@@ -1,4 +1,4 @@
-use notify::{Watcher, RecursiveMode, Result as NotifyResult, watcher};
+use notify::{Watcher, RecursiveMode, Result as NotifyResult, RecommendedWatcher, Config as NotifyConfig};
 use std::sync::{Arc, Mutex};
 use std::path::Path;
 use std::collections::HashMap;
@@ -44,13 +44,13 @@ impl FileSystemWatcher {
         let (tx, mut rx) = mpsc::unbounded_channel();
         
         // Create watcher
-        let mut watcher = watcher(
+        let mut watcher: RecommendedWatcher = RecommendedWatcher::new(
             move |res| {
                 if let Ok(_event) = res {
                     let _ = tx.send(());
                 }
             },
-            Default::default(),
+            NotifyConfig::default(),
         )?;
 
         // Watch all configured paths

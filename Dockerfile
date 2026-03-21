@@ -1,6 +1,4 @@
-"""
-Dockerfile for Resilience Forge Backend
-"""
+# Dockerfile for Resilience Forge Backend
 
 FROM python:3.11-slim
 

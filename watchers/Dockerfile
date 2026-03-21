@@ -1,10 +1,10 @@
 # Build stage for Rust file watcher
-FROM rust:1.70 AS builder
+FROM rust:latest AS builder
 
 WORKDIR /app
 
 # Copy Cargo files
-COPY Cargo.toml Cargo.lock ./
+COPY Cargo.toml ./
 
 # Create dummy source to cache dependencies
 RUN mkdir src && echo "fn main() {}" > src/main.rs
