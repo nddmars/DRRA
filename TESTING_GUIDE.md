@@ -262,7 +262,7 @@ asyncio.run(test_workflow())
 #### **Step 2: Detect Threats via Sentinel**
 ```python
 import asyncio
-from backend.services.sentinel_service import SentinelService
+from backend.services.vigil_service import VigilService
 
 async def test_detection():
     sentinel = SentinelService()
