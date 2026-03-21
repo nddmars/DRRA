@@ -2,9 +2,9 @@
 Initialize services package.
 """
 
-from .vigil_service import VgilService, TelemetryService
+from .vigil_service import VigilService, TelemetryService
 
 __all__ = [
-    "VgilService",
+    "VigilService",
     "TelemetryService"
 ]
