@@ -66,7 +66,7 @@ app.add_middleware(
 )
 
 # Include routers
-app.include_router(health_router.router, tags=["Health"])
+app.include_router(health_router.router, prefix="/api/v1", tags=["Health"])
 app.include_router(forge_router.router, prefix="/api/v1/forge", tags=["Forge Trigger"])
 app.include_router(vigil_router.router, prefix="/api/v1/vigil", tags=["Vigil Detection"])
 app.include_router(shield_router.router, prefix="/api/v1/shield", tags=["Shield Recovery"])

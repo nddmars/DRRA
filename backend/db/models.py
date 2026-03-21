@@ -154,7 +154,7 @@ class ForensicEvidenceModel(Base):
     hash_sha256 = Column(String(64), unique=True)
     retention_until = Column(DateTime)
     description = Column(String(512))
-    metadata = Column(JSON)
+    evidence_metadata = Column(JSON)
     
     def __repr__(self):
         return f"<ForensicEvidence {self.evidence_id}>"

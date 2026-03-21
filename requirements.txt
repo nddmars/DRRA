@@ -34,7 +34,7 @@ structlog==23.2.0
 
 # Security
 cryptography==41.0.7
-pyjwt==2.8.1
+pyjwt==2.8.0
 python-dotenv==1.0.0
 
 # Testing

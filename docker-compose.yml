@@ -65,7 +65,7 @@ services:
     volumes:
       - kafka_data:/var/lib/kafka/data
     healthcheck:
-      test: ["CMD", "kafka-broker-api-versions.sh", "--bootstrap-server", "localhost:9092"]
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/localhost/9092'"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -129,7 +129,8 @@ services:
         condition: service_healthy
       minio:
         condition: service_healthy
-    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    working_dir: /app/backend
     volumes:
       - .:/app
     healthcheck:
@@ -149,6 +150,7 @@ services:
       REACT_APP_API_URL: "http://localhost:8000/api/v1"
     depends_on:
       - backend
+    command: sh -c "npm install && npm start"
     volumes:
       - ./dashboard:/app
       - /app/node_modules
@@ -167,7 +169,6 @@ services:
       - backend
     volumes:
       - /tmp/honeypot:/tmp/honeypot
-    command: cargo run --release
 
 volumes:
   minio_data:
