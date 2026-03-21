@@ -370,10 +370,10 @@ async def test_attack_response_flow():
     payload_id = payload["payload_id"]
     print(f"   ✅ Payload deployed: {payload_id}")
     
-    # 2. SENTINEL: Record threat
-    print("\n2️⃣  SENTINEL: Detecting threat...")
+    # 2. VIGIL: Record threat
+    print("\n2️⃣  VIGIL: Detecting threat...")
     response = requests.post(
-        "http://localhost:8000/api/v1/sentinel/events",
+        "http://localhost:8000/api/v1/vigil/events",
         json={
             "event_id": "test-event-001",
             "timestamp": "2024-02-19T10:34:00Z",
