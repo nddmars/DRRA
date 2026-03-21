@@ -1,5 +1,7 @@
 """
-Sentinel ML Detection Engine - Behavioral pattern detection
+Vigil ML Detection Engine - Behavioral pattern detection
+ML-based pattern analysis for identifying ransomware attacks through entropy analysis,
+mass modification detection, and lateral movement identification.
 """
 
 import numpy as np

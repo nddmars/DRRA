@@ -88,7 +88,7 @@ ransomwaredefense/
 │   ├── services/              # Business logic (Forge, Sentinel, Shield)
 │   ├── models/                # Database & Pydantic models
 │   └── db/                    # Database configuration
-├── sentinel/                  # ML detection module (stub)
+├── vigil/                     # ML detection module (behavioral analysis)
 ├── forge/                     # Simulation engine (stub)
 ├── shield/                    # Recovery engine (stub)
 ├── dashboard/                 # React frontend
@@ -139,7 +139,7 @@ POST /api/v1/forge/identity-squat/kerberos-test
 GET /api/v1/sentinel/events?limit=100&threat_level=high
 
 # Record event
-POST /api/v1/sentinel/events
+POST /api/v1/vigil/events
 {
   "event_id": "evt-123",
   "threat_type": "mass_modification",
@@ -152,11 +152,11 @@ POST /api/v1/sentinel/events
 }
 
 # Analyze behavior
-POST /api/v1/sentinel/behaviors/analyze
+POST /api/v1/vigil/behaviors/analyze
 ?path=/tmp&process_id=1234&duration_seconds=60
 
 # Get LLM insights
-POST /api/v1/sentinel/insights/generate
+POST /api/v1/vigil/insights/generate
 ?event_id={event_id}
 ```
 
@@ -212,8 +212,8 @@ cd dashboard && npm test
 
 ### Run Specific Tests
 ```bash
-# Test only Sentinel
-pytest tests/test_services.py::TestSentinelService -v
+# Test only Vigil
+pytest tests/test_services.py::TestVigilService -v
 
 # Test with coverage
 pytest tests/ --cov=backend --cov-report=html

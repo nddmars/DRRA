@@ -12,8 +12,8 @@ This document summarizes the complete implementation of Resilience Forge (DRRA) 
 
 ## 🎯 Component Status
 
-### ✅ Sentinel Detection Engine
-**Location**: `backend/services/sentinel_service.py`
+### ✅ Vigil Detection Engine
+**Location**: `backend/services/vigil_service.py`
 
 **Features Implemented**:
 - **ML-Based Detection**: Entropy analysis, mass modification patterns, lateral movement tracking, VSS abuse detection
@@ -23,7 +23,7 @@ This document summarizes the complete implementation of Resilience Forge (DRRA) 
 - **Event Recording**: Full audit trail of all detection events
 
 **Key Classes**:
-- `SentinelService`: Main detection orchestration
+- `VigilService`: Main detection orchestration
 - `BehaviorPatternDetector`: ML threat pattern recognition
 - `TelemetryService`: Write-once logging to immutable storage
 
@@ -89,7 +89,7 @@ This document summarizes the complete implementation of Resilience Forge (DRRA) 
 - `POST /honeypot/generate` - Create honeypot files
 - `POST /identity-squat/kerberos-test` - Kerberos simulation
 
-**Sentinel Routes** (`/api/v1/sentinel`):
+**Vigil Routes** (`/api/v1/vigil`):
 - `GET /events` - List detection events
 - `POST /events` - Record new threat
 - `POST /behaviors/analyze` - ML threat analysis
@@ -170,7 +170,7 @@ This document summarizes the complete implementation of Resilience Forge (DRRA) 
 
 **Test Classes**:
 - `TestForgeService` - Payload & honeypot tests
-- `TestSentinelService` - Detection & ML tests
+- `TestVigilService` - Detection & ML tests
 - `TestShieldService` - Recovery & isolation tests
 - `TestBehaviorPatternDetector` - Pattern detection tests
 - `TestIntegration` - End-to-end workflows
@@ -213,7 +213,7 @@ pytest tests/ -v --cov=backend --cov-report=html
 **Total Implementation**: ~3,750 lines of production code
 
 ### Architecture Validation
-✅ Modular service layer (Forge, Sentinel, Shield)  
+✅ Modular service layer (Forge, Vigil, Shield)  
 ✅ RESTful API with async/await  
 ✅ Type-safe construction (Pydantic + Rust)  
 ✅ Comprehensive error handling  
@@ -285,7 +285,7 @@ See [DEVELOPMENT_GUIDE.md](./DEVELOPMENT_GUIDE.md) for:
 ┌────────────────────▼────────────────────────────────┐
 │          FastAPI Backend (http:8000)
 │  ┌──────────────┬──────────────┬──────────────┐
-│  │    Forge     │   Sentinel   │    Shield    │
+│  │    Forge     │    Vigil     │    Shield    │
 │  │ (Simulator)  │ (Detection)  │  (Recovery)  │
 │  └──────────────┴──────────────┴──────────────┘
 ├───────────────────────────────────────────────────────┤
