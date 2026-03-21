@@ -106,6 +106,69 @@ services:
     depends_on:
       - prometheus
 
+  # FastAPI Backend - Main application server
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: "postgresql://drra_admin:drra_secure_password@postgres:5432/resilience_forge"
+      REDIS_URL: "redis://redis:6379"
+      KAFKA_BROKERS: "kafka:29092"
+      MINIO_ENDPOINT: "minio:9000"
+      MINIO_ACCESS_KEY: "minioadmin"
+      MINIO_SECRET_KEY: "minioadmin"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      kafka:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+    volumes:
+      - .:/app
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # React Dashboard - Frontend application
+  dashboard:
+    build:
+      context: ./dashboard
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    environment:
+      REACT_APP_API_URL: "http://localhost:8000/api/v1"
+    depends_on:
+      - backend
+    volumes:
+      - ./dashboard:/app
+      - /app/node_modules
+    stdin_open: true
+    tty: true
+
+  # Rust File Watcher - Real-time file monitoring
+  watcher:
+    build:
+      context: ./watchers
+      dockerfile: Dockerfile
+    environment:
+      BACKEND_URL: "http://backend:8000"
+      WATCH_PATH: "/tmp/honeypot"
+    depends_on:
+      - backend
+    volumes:
+      - /tmp/honeypot:/tmp/honeypot
+    command: cargo run --release
+
 volumes:
   minio_data:
   postgres_data:
