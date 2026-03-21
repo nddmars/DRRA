@@ -3,34 +3,65 @@
 
 **The industry standard for architecting, testing, and validating ransomware-proof ecosystems through automation and AI.**
 
+## 🛡️ Three Pillars of Ransomware Defense
+
+**Built on the WALL-SQUAT-GRAB framework:**
+
+1. **WALL — PREVENT** 🔵 (Vigil)
+   - AI-driven behavioral detection identifies threats before encryption
+   - Entropy analysis detects encryption attempts
+   - Mass modification patterns flagged in real-time
+   - Lateral movement tracking blocks privilege escalation
+
+2. **SQUAT — SURVIVE** 🟡 (Shield)
+   - SOAR automation + rapid response limits blast radius
+   - Micro-segmentation isolates compromised systems
+   - Automated containment triggers within seconds
+   - Network isolation prevents lateral spread
+
+3. **GRAB — CONTROL** 🔴 (Recovery)
+   - Immutable backups ensure recovery capability
+   - Verified backup restoration validates data integrity
+   - Automated failover to known-good state
+   - Forensic preservation maintains compliance
+
 ## Vision
 
 Resilience Forge is an open-source "Assume Breach" laboratory providing a controlled playground where engineers build:
-- **Defensible perimeters** - Automated isolation and micro-segmentation
-- **Resilient cores** - AI-driven detection and immutable logging
-- **Recovery mechanisms** - Automated healing and forensic capabilities
+- **Defensible perimeters** (SQUAT) - Automated isolation and micro-segmentation
+- **Resilient cores** (WALL) - AI-driven detection and immutable logging
+- **Recovery mechanisms** (GRAB) - Automated healing and forensic capabilities
 
 ## Core Components
 
-### 1. **The Forge** (Simulation Engine)
-- Honeypot Architect: Generates realistic file structures to act as detection tripwires
-- Resilience Payloads: Safe, non-propagating scripts mimicking encryption entropy
-- Identity Squatting Tests: Validates lateral movement defenses
+### 1. **The Forge** (Simulation Engine - Testing Framework)
+- **Purpose**: Safe, controlled testing of all three pillars without real threats
+- **Honeypot Architect**: Generates realistic file structures to act as detection tripwires
+- **Resilience Payloads**: Safe, non-propagating scripts mimicking encryption entropy
+- **Identity Squatting Tests**: Validates lateral movement defenses
+- **Use**: `POST /api/v1/forge/deploy` to simulate ransomware attacks
 
-### 2. **The Sentinel** (Detection & Auditing)
-- Behavioral Intelligence: ML-based mass modification pattern detection
-- Immutable Telemetry: Write-once logging pipeline (Vector → MinIO)
-- LLM Insights: Gemini 2.5 Flash integration for attack summarization
+### 2. **Vigil** (Detection & Auditing - WALL/PREVENT)
+- **Purpose**: Detect threats BEFORE they cause damage
+- **Behavioral Intelligence**: ML-based mass modification pattern detection
+- **Entropy Analysis**: Identifies encryption attempts (Shannon entropy >0.85)
+- **Immutable Telemetry**: Write-once logging pipeline (Vector → MinIO)
+- **LLM Insights**: Gemini 2.5 Flash integration for attack summarization
+- **Use**: `GET /api/v1/vigil/events` to retrieve detections
 
-### 3. **The Shield** (Recovery & Isolation)
-- Dynamic Micro-Segmentation: Automated VLAN isolation via API
-- Immutable Object Locking: Storage-layer compliance mode activation
-- Forensic Curation: Preserve and analyze attack artifacts
+### 3. **The Shield** (Response & Recovery - SQUAT/GRAB)
+- **Purpose**: Contain threats rapidly and restore operations
+- **Dynamic Micro-Segmentation**: Automated VLAN isolation via API (SQUAT)
+- **Immutable Object Locking**: Storage-layer compliance mode activation (GRAB)
+- **Automated Recovery**: Verified backup restoration to known-good state
+- **Forensic Curation**: Preserve and analyze attack artifacts
+- **Use**: `POST /api/v1/shield/isolate` for immediate containment
 
 ### 4. **The Dashboard** (Monitoring & Control)
-- MTTC Tracker: Real-time Mean Time to Contain metrics
-- Defensibility Index: Score-based hardening benchmarking
-- Configuration Studio: Granular threshold management
+- **MTTC Tracker**: Real-time Mean Time to Contain metrics
+- **Defensibility Index**: Measures effectiveness of all three pillars (0-100)
+- **Incident Timeline**: Visualizes attack progression and response
+- **Configuration Studio**: Granular threshold management for each pillar
 
 ## Technology Stack
 
@@ -50,15 +81,15 @@ Resilience Forge is an open-source "Assume Breach" laboratory providing a contro
 ```
 ransomwaredefense/
 ├── backend/              # FastAPI core services
-├── sentinel/             # ML detection & telemetry
-├── forge/               # Simulation & payload testing
-├── shield/              # Recovery & isolation
-├── dashboard/           # Frontend & monitoring UI
-├── watchers/            # Rust file monitoring
-├── infra/               # Ansible & deployment configs
-├── tests/               # CI/CD test suite (The Gauntlet)
-├── docs/                # Architecture & design docs
-└── docker-compose.yml   # Container orchestration
+├── vigil/                # WALL (PREVENT) - ML detection & telemetry
+├── forge/                # Simulation & payload testing framework
+├── shield/               # SQUAT/GRAB (SURVIVE/CONTROL) - Response & recovery
+├── dashboard/            # Frontend & monitoring UI (Defensibility Index)
+├── watchers/             # Rust file monitoring (real-time event stream)
+├── infra/                # Ansible & deployment configs
+├── tests/                # CI/CD test suite (The Gauntlet)
+├── docs/                 # Architecture & design docs
+└── docker-compose.yml    # Container orchestration
 ```
 
 ## Quick Start

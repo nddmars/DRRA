@@ -1,20 +1,27 @@
 # Resilience Forge Architecture Guide
 
-## System Overview
+## 🛡️ Three Pillars of Defense Framework
 
-Resilience Forge (DRRA) is built on four core defensive systems:
+Resilience Forge (DRRA) implements the **WALL-SQUAT-GRAB** framework:
+
+- **WALL** 🔵 (PREVENT) - Vigil detects threats before encryption spreads
+- **SQUAT** 🟡 (SURVIVE) - Shield contains and responds within seconds
+- **GRAB** 🔴 (CONTROL) - Recovery restores from verified immutable backups
+
+## System Overview
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│                    THE FOREST (UI/Control)              │
-│  - Dashboard (Real-time metrics & DI scoring)          │
+│                    DASHBOARD (Control Center)           │
+│  - Defensibility Index (0-100 higher is better)        │
+│  - Real-time MTTC (Mean Time to Contain)               │
+│  - Incident Timeline & Response Tracking               │
 │  - Configuration Studio (Threshold management)          │
-│  - Incident Management (Response & playbooks)           │
 └────────────┬────────────────┬────────────────┬──────────┘
              │                │                │
     ┌────────▼─────┐  ┌──────▼──────┐  ┌──────▼──────┐
-    │   THE FORGE   │  │  SENTINEL   │  │  THE SHIELD │
-    │  (Simulation) │  │ (Detection) │  │  (Recovery) │
+    │   THE FORGE   │  │    VIGIL    │  │  THE SHIELD │
+    │(Testing/Sim) │  │ (PREVENT)  │  │(SURVIVE/CTL)│
     ├───────────────┤  ├─────────────┤  ├─────────────┤
     │ • Honeypots  │  │ • ML Engine │  │ • Isolation │
     │ • Payloads   │  │ • Entropy   │  │ • Locking   │
@@ -22,19 +29,29 @@ Resilience Forge (DRRA) is built on four core defensive systems:
     │   Squatting  │  │ • Telemetry │  │ • Forensics │
     └───────────────┘  └─────────────┘  └─────────────┘
              │                │                │
+    ┌────────────────────────────────────────────────────┐
+    │    WATCHER (Real-time File System Monitoring)      │
+    │  - Rust-based file event detection                 │
+    │  - Sub-millisecond latency                         │
+    │  - Entropy spike detection                         │
+    │  - Mass modification tracking                      │
+    └────────────────────────────────────────────────────┘
+             │                │                │
 └────────────┴────────────────┴──────────────────────────┐
 │         IMMUTABLE FOUNDATION (MinIO + PostgreSQL)      │
-│  - Write-Once Object Storage (with Object Lock)       │
-│  - Tamper-Proof Audit Logs                             │
-│  - Forensic Evidence Preservation                      │
+│  - WALL: Write-Once Object Storage (Compliance Mode)  │
+│  - SQUAT: Micro-segmentation rules & isolation state  │
+│  - GRAB: Verified backup catalogs & recovery plans    │
+│  - Tamper-Proof Audit Logs (365-day retention)        │
 └─────────────────────────────────────────────────────────┘
 ```
 
 ## Component Details
 
-### 1. The Forge (Simulation Engine) - `forge/`
+### 1. The Forge (Testing Framework) - `forge/`
 
-**Purpose**: Safe, controlled testing of defenses without real threats.
+**Purpose**: Safe, controlled testing of all three pillars (WALL, SQUAT, GRAB) without real threats.
+**Role**: Tests the Vigil detection, Shield containment, and Recovery capabilities
 
 **Components**:
 - **Honeypot Architect**: Generates realistic file structures
@@ -57,76 +74,88 @@ Resilience Forge (DRRA) is built on four core defensive systems:
 - `POST /api/v1/forge/honeypot/generate` - Create honeypot files
 - `POST /api/v1/forge/identity-squat/kerberos-test` - Test lateral movement
 
-### 2. The Sentinel (Detection) - `sentinel/`
+### 2. Vigil (Detection Engine - WALL/PREVENT) - `vigil/`
 
-**Purpose**: AI-driven threat detection with immutable logging.
+**Purpose**: Detect threats BEFORE they cause damage through AI-driven behavioral analysis.
+**Pillar**: WALL (PREVENT) - Identifies threats before encryption spreads
 
 **Components**:
 - **Behavioral ML Engine** (`detector.py`)
-  - Mass modification detection (>15% files in 60s)
-  - Entropy analysis (>0.85 indicates encryption)
-  - Lateral movement tracking
-  - VSS (Volume Shadow Copy) abuse detection
+  - Mass modification detection (>15% files in 60s) = CRITICAL
+  - Entropy analysis (>0.85 indicates encryption) = CRITICAL  
+  - Lateral movement tracking (process spawning chains) = HIGH
+  - VSS (Volume Shadow Copy) abuse detection = CRITICAL
   
-- **Immutable Telemetry Pipeline**
+- **Immutable Telemetry Pipeline** (Write-once logging)
   - Vector/Fluentd → Kafka → MinIO
-  - Write-once object storage (S3 compliance mode)
-  - Object Lock prevents deletion during retention period
-  - 365-day minimum retention
+  - All events logged to write-once object storage (S3 compliance mode)
+  - Object Lock prevents deletion during 365-day retention period
+  - Tamper-proof for compliance (HIPAA, PCI-DSS, SOC2)
   
 - **LLM Integration** (Google Gemini 2.5 Flash)
   - Plain-English attack summarization
   - Recommended hardening actions
   - Defensibility gap identification
 
-**Key Features**:
-- Real-time file access monitoring
-- Process behavior correlation
-- Entropy calculation (Shannon entropy formula)
-- Tamper-proof log preservation
+**Detection Signatures**:
+| Pattern | Threshold | Severity |
+|---------|-----------|----------|
+| Entropy Score | >0.85 | CRITICAL |
+| Mass Modification | >15% in 60s | CRITICAL |
+| Lateral Movement | 2+ suspicious processes | HIGH |
+| VSS Abuse | vssadmin delete detected | CRITICAL |
 
 **API Endpoints**:
-- `GET /api/v1/sentinel/events` - Retrieve detection events
-- `POST /api/v1/sentinel/behaviors/analyze` - Trigger analysis
-- `GET /api/v1/sentinel/telemetry` - Immutable log access
-- `POST /api/v1/sentinel/insights/generate` - LLM analysis
+- `GET /api/v1/vigil/events` - Retrieve detection events
+- `POST /api/v1/vigil/behaviors/analyze` - Trigger analysis
+- `GET /api/v1/vigil/telemetry` - Immutable log access
+- `POST /api/v1/vigil/insights/generate` - LLM analysis
 
-### 3. The Shield (Recovery) - `shield/`
+### 3. The Shield (Response & Recovery - SQUAT/GRAB) - `shield/`
 
-**Purpose**: Automated isolation, recovery, and forensic preservation.
+**Purpose**: Rapidly contain threats AND restore operations from verified backups.
+**Pillars**: 
+  - SQUAT (SURVIVE) - Automated containment limits blast radius
+  - GRAB (CONTROL) - Verified recovery restores known-good state
 
 **Components**:
-- **Dynamic Micro-Segmentation**
-  - Automated VLAN isolation via API
-  - Network quarantine without manual intervention
+- **Dynamic Micro-Segmentation** (SQUAT)
+  - Automated VLAN isolation via API (network quarantine)
+  - Blocks lateral movement within 30 seconds
   - Rollback capability for false positives
   
-- **Immutable Object Locking**
+- **Immutable Object Locking** (GRAB)
   - MinIO Compliance Mode activation
   - Legal hold on critical forensic buckets
-  - Prevents even admin deletion during retention
+  - Prevents even admin deletion (tamper-proof backups)
   
-- **Recovery Orchestration**
-  - Snapshot restoration (hourly snapshots)
+- **Recovery Orchestration** (GRAB)
+  - Snapshot restoration from verified backups
   - Credential revocation automation
-  - Block-level incremental restores
+  - Block-level incremental restores (minimize downtime)
   - Parallel recovery threads (default: 8)
   
-- **Forensic Curation**
-  - Automatic evidence preservation
-  - Chain of custody logging
+- **Forensic Curation** (GRAB)
+  - Automatic evidence preservation (chain of custody)
+  - Attack artifacts captured for post-incident analysis
   - 90-day default retention (configurable)
 
-**Critical Metrics**:
+**Critical Metrics for SQUAT**:
 - **MTTC (Mean Time to Contain)**: Target < 60 seconds
+- **Isolation Effectiveness**: 100% (no lateral spread)
+- **False Positive Rollback**: < 5 seconds
+
+**Critical Metrics for GRAB**:
+- **MTTR (Mean Time to Restore)**: Target < 15 minutes
 - **Data Loss**: Target < 0.1%
-- **Immutability**: 100% (all logs protected)
+- **Backup Verification**: 100% integrity checks
+- **Recovery Completeness**: 99.99%+
 
 **API Endpoints**:
-- `POST /api/v1/shield/isolate` - Trigger isolation
-- `POST /api/v1/shield/object-lock/activate` - Enable locking
-- `POST /api/v1/shield/recovery/create` - Start recovery
-- `POST /api/v1/shield/forensics/preserve` - Archive evidence
+- `POST /api/v1/shield/isolate` - Trigger isolation (SQUAT)
+- `POST /api/v1/shield/object-lock/activate` - Enable backup locking (GRAB)
+- `POST /api/v1/shield/recovery/create` - Start recovery (GRAB)
+- `POST /api/v1/shield/forensics/preserve` - Archive evidence (GRAB)
 
 ### 4. The Dashboard (Control Center) - `dashboard/`
 
