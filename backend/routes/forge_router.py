@@ -5,13 +5,14 @@ FR-1: Honeypot Architect, Resilience Payloads, Identity Squatting Tests
 
 from fastapi import APIRouter, HTTPException, BackgroundTasks
 from models.schemas import (
-    ForgePayloadRequest, 
-    ForgePayloadResponse, 
+    ForgePayloadRequest,
+    ForgePayloadResponse,
     HoneypotConfig,
     PayloadType
 )
 from datetime import datetime, timedelta
 import uuid
+from routes.vigil_router import detected_events
 
 router = APIRouter()
 
@@ -45,10 +46,58 @@ async def deploy_payload(
     }
     
     active_payloads[payload_id] = payload_record
-    
+
+    # Seed detection events into VIGIL to simulate the FORGE → WATCHER → VIGIL pipeline
+    now = datetime.utcnow().isoformat()
+    detected_events[f"evt_{payload_id}_mass"] = {
+        "event_id": f"evt_{payload_id}_mass",
+        "timestamp": now,
+        "threat_type": "mass_modification",
+        "threat_level": "critical",
+        "affected_path": request.target_path,
+        "file_count": 5420,
+        "entropy_score": 0.89,
+        "confidence": 0.96,
+        "details": {
+            "modified_files": ["report.pdf", "budget.xlsx", "contracts.docx"],
+            "vss_detected": False,
+            "lateral_movement": False
+        }
+    }
+    detected_events[f"evt_{payload_id}_vss"] = {
+        "event_id": f"evt_{payload_id}_vss",
+        "timestamp": now,
+        "threat_type": "vssadmin_abuse",
+        "threat_level": "critical",
+        "affected_path": "\\\\shadow copy",
+        "file_count": 850,
+        "entropy_score": 0.0,
+        "confidence": 0.99,
+        "details": {
+            "modified_files": [],
+            "vss_detected": True,
+            "lateral_movement": False
+        }
+    }
+    detected_events[f"evt_{payload_id}_lateral"] = {
+        "event_id": f"evt_{payload_id}_lateral",
+        "timestamp": now,
+        "threat_type": "lateral_movement",
+        "threat_level": "high",
+        "affected_path": request.target_path,
+        "file_count": 0,
+        "entropy_score": 0.0,
+        "confidence": 0.91,
+        "details": {
+            "modified_files": [],
+            "vss_detected": False,
+            "lateral_movement": True
+        }
+    }
+
     # Schedule payload cleanup
     background_tasks.add_task(cleanup_payload, payload_id)
-    
+
     return ForgePayloadResponse(
         payload_id=payload_id,
         name=request.name,

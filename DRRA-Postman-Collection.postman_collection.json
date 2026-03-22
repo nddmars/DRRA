@@ -14,26 +14,42 @@
           "request": {
             "method": "GET",
             "url": {
-              "raw": "{{base_url}}/health",
+              "raw": "{{base_url}}/api/v1/health",
               "host": ["{{base_url}}"],
-              "path": ["health"]
+              "path": ["api", "v1", "health"]
             },
             "description": "Check if API is running"
           },
-          "response": []
+          "response": [
+            {
+              "name": "Healthy Response",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n    \"status\": \"healthy\",\n    \"timestamp\": \"2026-03-21T21:55:55.516819\",\n    \"service\": \"Resilience Forge (DRRA)\"\n}"
+            }
+          ]
         },
         {
           "name": "Readiness Probe",
           "request": {
             "method": "GET",
             "url": {
-              "raw": "{{base_url}}/ready",
+              "raw": "{{base_url}}/api/v1/ready",
               "host": ["{{base_url}}"],
-              "path": ["ready"]
+              "path": ["api", "v1", "ready"]
             },
             "description": "Kubernetes readiness probe"
           },
-          "response": []
+          "response": [
+            {
+              "name": "Ready Response",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n    \"ready\": true,\n    \"timestamp\": \"2026-03-21T21:55:55.516819\"\n}"
+            }
+          ]
         },
         {
           "name": "Dashboard Summary",
@@ -46,7 +62,15 @@
             },
             "description": "Get overall system metrics and defensibility index"
           },
-          "response": []
+          "response": [
+            {
+              "name": "Dashboard Summary Response",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n    \"metrics\": {\n        \"total_incidents\": 47,\n        \"active_incidents\": 2,\n        \"total_files_affected\": 125000,\n        \"files_recovered\": 124750,\n        \"mttc_average\": 45.3,\n        \"mttc_target\": 60.0,\n        \"mttc_achieved\": true,\n        \"containment_success_rate\": 0.98,\n        \"data_loss_percentage\": 0.2\n    },\n    \"defensibility_index\": {\n        \"overall_score\": 87,\n        \"detection_score\": 92,\n        \"isolation_score\": 85,\n        \"recovery_score\": 88,\n        \"immutability_score\": 79,\n        \"community_percentile\": 76\n    },\n    \"system_health\": {\n        \"status\": \"healthy\",\n        \"components\": {\n            \"forge\": \"healthy\",\n            \"vigil\": \"healthy\",\n            \"shield\": \"operational\",\n            \"storage\": \"healthy\",\n            \"messaging\": \"healthy\"\n        }\n    }\n}"
+            }
+          ]
         }
       ]
     },
@@ -65,7 +89,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"First Test Honeypot\",\n  \"payload_type\": \"honeypot\",\n  \"target_path\": \"C:\\\\test\",\n  \"duration_seconds\": 60\n}"
+              "raw": "{\n  \"name\": \"conference_demo_attack\",\n  \"payload_type\": \"honeypot\",\n  \"target_path\": \"/tmp/honeypot\",\n  \"duration_seconds\": 60,\n  \"intensity\": 1.0\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/v1/forge/deploy",
@@ -74,7 +98,15 @@
             },
             "description": "Deploy a honeypot simulation at specified path"
           },
-          "response": []
+          "response": [
+            {
+              "name": "Deploy Success",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n    \"payload_id\": \"4e074a8c-34f3-401f-995f-7b7d7d8df173\",\n    \"name\": \"conference_demo_attack\",\n    \"status\": \"deployed\",\n    \"start_time\": \"2026-03-21T22:01:52.426076\",\n    \"estimated_end_time\": \"2026-03-21T22:02:52.426076\",\n    \"detection_expected\": true\n}"
+            }
+          ]
         },
         {
           "name": "Generate Honeypot Files",
@@ -138,7 +170,7 @@
       ]
     },
     {
-      "name": "SENTINEL - Detection & Auditing",
+      "name": "VIGIL - Detection & Auditing",
       "item": [
         {
           "name": "Record Detection Event",
@@ -152,12 +184,12 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"event_id\": \"test_evt_001\",\n  \"timestamp\": \"2026-03-19T10:00:00Z\",\n  \"threat_type\": \"mass_modification\",\n  \"threat_level\": \"high\",\n  \"affected_path\": \"C:\\\\test\",\n  \"file_count\": 5000,\n  \"entropy_score\": 0.87,\n  \"confidence\": 0.94,\n  \"details\": {\n    \"modified_files\": [\"file1.pdf\", \"file2.docx\"],\n    \"vss_detected\": false,\n    \"lateral_movement\": false\n  }\n}"
+              "raw": "{\n  \"event_id\": \"test_evt_001\",\n  \"timestamp\": \"2026-03-21T10:00:00Z\",\n  \"threat_type\": \"mass_modification\",\n  \"threat_level\": \"high\",\n  \"affected_path\": \"/tmp/honeypot\",\n  \"file_count\": 5000,\n  \"entropy_score\": 0.87,\n  \"confidence\": 0.94,\n  \"details\": {\n    \"modified_files\": [\"file1.pdf\", \"file2.docx\"],\n    \"vss_detected\": false,\n    \"lateral_movement\": false\n  }\n}"
             },
             "url": {
-              "raw": "{{base_url}}/api/v1/sentinel/events",
+              "raw": "{{base_url}}/api/v1/vigil/events",
               "host": ["{{base_url}}"],
-              "path": ["api", "v1", "sentinel", "events"]
+              "path": ["api", "v1", "vigil", "events"]
             },
             "description": "Record a threat detection event (mass file modification, encryption attempt)"
           },
@@ -168,11 +200,33 @@
           "request": {
             "method": "GET",
             "url": {
-              "raw": "{{base_url}}/api/v1/sentinel/events",
+              "raw": "{{base_url}}/api/v1/vigil/events",
               "host": ["{{base_url}}"],
-              "path": ["api", "v1", "sentinel", "events"]
+              "path": ["api", "v1", "vigil", "events"]
             },
             "description": "Retrieve all recorded detection events"
+          },
+          "response": [
+            {
+              "name": "Events Response",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n    \"total_count\": 2,\n    \"events\": [\n        {\n            \"event_id\": \"evt_001\",\n            \"timestamp\": \"2026-03-21T21:32:57Z\",\n            \"threat_type\": \"mass_modification\",\n            \"threat_level\": \"high\",\n            \"affected_path\": \"/tmp/honeypot\",\n            \"file_count\": 5420,\n            \"entropy_score\": 0.87,\n            \"confidence\": 0.94\n        },\n        {\n            \"event_id\": \"evt_002\",\n            \"timestamp\": \"2026-03-21T21:32:57Z\",\n            \"threat_type\": \"vssadmin_abuse\",\n            \"threat_level\": \"critical\",\n            \"affected_path\": \"\\\\\\\\shadow copy\",\n            \"file_count\": 850,\n            \"entropy_score\": 0.0,\n            \"confidence\": 0.99\n        }\n    ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Critical Events",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/v1/vigil/events?threat_level=critical",
+              "host": ["{{base_url}}"],
+              "path": ["api", "v1", "vigil", "events"],
+              "query": [{ "key": "threat_level", "value": "critical" }]
+            },
+            "description": "Retrieve only critical threat detection events"
           },
           "response": []
         },
@@ -181,9 +235,9 @@
           "request": {
             "method": "GET",
             "url": {
-              "raw": "{{base_url}}/api/v1/sentinel/telemetry",
+              "raw": "{{base_url}}/api/v1/vigil/telemetry",
               "host": ["{{base_url}}"],
-              "path": ["api", "v1", "sentinel", "telemetry"]
+              "path": ["api", "v1", "vigil", "telemetry"]
             },
             "description": "Get immutable telemetry logs from MinIO"
           },
@@ -201,50 +255,27 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"path\": \"C:\\\\test\",\n  \"process_id\": 1234,\n  \"duration_seconds\": 60\n}"
+              "raw": "{\n  \"path\": \"/tmp/honeypot\",\n  \"process_id\": 1234,\n  \"duration_seconds\": 60\n}"
             },
             "url": {
-              "raw": "{{base_url}}/api/v1/sentinel/behaviors/analyze",
+              "raw": "{{base_url}}/api/v1/vigil/behaviors/analyze",
               "host": ["{{base_url}}"],
-              "path": ["api", "v1", "sentinel", "behaviors", "analyze"]
+              "path": ["api", "v1", "vigil", "behaviors", "analyze"]
             },
-            "description": "Scan a directory for behavioral threat indicators (was: /sentinel/analyze — FIXED)"
+            "description": "Scan a directory for behavioral threat indicators"
           },
           "response": []
         },
         {
-          "name": "Generate LLM Insight (Gemini)",
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"event_id\": \"test_evt_001\"\n}"
-            },
-            "url": {
-              "raw": "{{base_url}}/api/v1/sentinel/insights/generate",
-              "host": ["{{base_url}}"],
-              "path": ["api", "v1", "sentinel", "insights", "generate"]
-            },
-            "description": "Generate Gemini LLM plain-English attack summary and recommendations"
-          },
-          "response": []
-        },
-        {
-          "name": "Sentinel Status",
+          "name": "Vigil Status",
           "request": {
             "method": "GET",
             "url": {
-              "raw": "{{base_url}}/api/v1/sentinel/status",
+              "raw": "{{base_url}}/api/v1/vigil/status",
               "host": ["{{base_url}}"],
-              "path": ["api", "v1", "sentinel", "status"]
+              "path": ["api", "v1", "vigil", "status"]
             },
-            "description": "Get Sentinel detection engine status"
+            "description": "Get Vigil detection engine status"
           },
           "response": []
         }
@@ -295,7 +326,7 @@
               "host": ["{{base_url}}"],
               "path": ["api", "v1", "shield", "object-lock", "activate"]
             },
-            "description": "Activate write-once object locking for immutable storage (was: /shield/activate-lock — FIXED)"
+            "description": "Activate write-once object locking for immutable storage"
           },
           "response": []
         },
@@ -318,7 +349,7 @@
               "host": ["{{base_url}}"],
               "path": ["api", "v1", "shield", "recovery", "create"]
             },
-            "description": "Initiate automated recovery from snapshot (was: /shield/recover — FIXED)"
+            "description": "Initiate automated recovery from snapshot"
           },
           "response": []
         },
@@ -347,14 +378,14 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"incident_id\": \"INC-20260319-001\",\n  \"retention_days\": 90\n}"
+              "raw": "{\n  \"incident_id\": \"INC-20260321-001\",\n  \"retention_days\": 90\n}"
             },
             "url": {
               "raw": "{{base_url}}/api/v1/shield/forensics/preserve",
               "host": ["{{base_url}}"],
               "path": ["api", "v1", "shield", "forensics", "preserve"]
             },
-            "description": "Archive forensic artifacts to immutable MinIO storage (was: GET forensics — FIXED to POST preserve)"
+            "description": "Archive forensic artifacts to immutable MinIO storage"
           },
           "response": []
         },
@@ -369,7 +400,15 @@
             },
             "description": "Get Shield isolation and recovery engine status"
           },
-          "response": []
+          "response": [
+            {
+              "name": "Shield Status Response",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n    \"status\": \"operational\",\n    \"components\": {\n        \"isolation_engine\": \"healthy\",\n        \"object_lock_manager\": \"healthy\",\n        \"recovery_orchestrator\": \"healthy\",\n        \"forensics_archiver\": \"healthy\"\n    },\n    \"recovery_capabilities\": {\n        \"snapshot_restore\": true,\n        \"credential_revocation\": true,\n        \"system_rebuild\": true,\n        \"incremental_restore\": true\n    },\n    \"immutable_storage\": {\n        \"enabled\": true,\n        \"backend\": \"MinIO\",\n        \"object_lock\": \"enabled\",\n        \"retention_days\": 365\n    }\n}"
+            }
+          ]
         }
       ]
     },
@@ -385,9 +424,17 @@
               "host": ["{{base_url}}"],
               "path": ["api", "v1", "dashboard", "defensibility-index"]
             },
-            "description": "Get Defensibility Index score (0-100) (was: /metrics/defensibility — FIXED)"
+            "description": "Get Defensibility Index score (0-100)"
           },
-          "response": []
+          "response": [
+            {
+              "name": "Defensibility Index Response",
+              "status": "OK",
+              "code": 200,
+              "header": [{ "key": "Content-Type", "value": "application/json" }],
+              "body": "{\n    \"overall_score\": 87,\n    \"detection_score\": 92,\n    \"isolation_score\": 85,\n    \"recovery_score\": 88,\n    \"immutability_score\": 79,\n    \"community_percentile\": 76\n}"
+            }
+          ]
         },
         {
           "name": "Get MTTC Metrics",

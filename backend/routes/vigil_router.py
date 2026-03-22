@@ -21,20 +21,25 @@ detected_events = {}
 behavior_patterns = {}
 
 @router.get("/events")
-async def get_detection_events(limit: int = 100, threat_level: str = None):
+async def get_detection_events(limit: int = 100, threat_level: str = None, payload_id: str = None):
     """
     Retrieve recent detection events.
-    
+
     Optional filters:
     - threat_level: Filter by threat level (low, medium, high, critical)
+    - payload_id: Filter by originating FORGE payload ID
     """
     events = list(detected_events.values())
-    
+
     if threat_level:
         events = [e for e in events if e.get("threat_level") == threat_level]
-    
+
+    if payload_id:
+        events = [e for e in events if payload_id in e.get("event_id", "")]
+
     return {
         "total_count": len(events),
+        "payload_id": payload_id,
         "events": events[:limit]
     }
 
