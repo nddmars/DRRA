@@ -20,10 +20,10 @@ const Dashboard = () => {
   const fetchDashboardData = async () => {
     try {
       // Fetch from backend API
-      const response = await fetch('http://localhost:8000/api/v1/dashboard/metrics');
+      const response = await fetch('http://localhost:8000/api/v1/dashboard/summary');
       if (response.ok) {
         const data = await response.json();
-        setMttc(data.mttc_average || 0);
+        setMttc(data.metrics?.mttc_average || 0);
         setDefensibility(data.defensibility_index?.overall_score || 0);
       }
     } catch (error) {
