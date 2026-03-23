@@ -1,0 +1,122 @@
+title: Ransomware - File Entropy Spike (Encryption Detection)
+id: 4b8c1d56-efgh-4567-jk01-234567890123
+description: >
+  Detects rapid increases in file entropy consistent with active ransomware encryption.
+  Shannon entropy of encrypted/compressed files is typically >0.85 (scale 0-1.0).
+  This rule triggers when entropy scores spike across multiple files in a short window,
+  indicating bulk encryption of user data. This is the most reliable real-time signal
+  that ransomware payload execution is underway.
+status: stable
+author: Resilience Forge Team
+date: 2026/03/21
+
+logsource:
+  category: file_access
+  product: windows
+  service: drra_watcher  # DRRA Rust file watcher emits entropy events
+
+detection:
+  # Single file with high entropy written by unexpected process
+  high_entropy_write:
+    EventID: 11               # FileCreate (Sysmon)
+    EntropyScore|gt: 0.85
+    Image|endswith:
+      - '\explorer.exe'
+      - '\svchost.exe'
+      - '\cmd.exe'
+      - '\powershell.exe'
+      - '\wscript.exe'
+      - '\cscript.exe'
+    TargetFilename|contains:
+      - 'C:\Users\'
+      - 'C:\Documents'
+      - 'D:\'
+
+  # Entropy spike across multiple files in short window
+  entropy_spike:
+    EntropyScore|gt: 0.85
+    FileCountThreshold: 10    # 10+ high-entropy files in timeframe
+    TimeframeWindow: 30s      # within 30 seconds
+
+  # File extension changed to ransom extension
+  extension_change:
+    EventID: 11
+    TargetFilename|endswith:
+      - '.encrypted'
+      - '.locked'
+      - '.enc'
+      - '.crypted'
+      - '.crypt'
+      - '.crypto'
+      - '.pay2decrypt'
+      - '.wncry'               # WannaCry
+      - '.ryk'                 # Ryuk
+      - '.rbyw'                # REvil
+      - '.maze'                # Maze
+      - '.conti'               # Conti
+      - '.darkside'            # DarkSide
+
+  # Ransom note creation
+  ransom_note:
+    EventID: 11
+    TargetFilename|contains:
+      - 'README'
+      - 'DECRYPT'
+      - 'HOW_TO'
+      - 'RECOVER'
+      - 'YOUR_FILES'
+      - 'RESTORE'
+    TargetFilename|endswith:
+      - '.txt'
+      - '.html'
+      - '.hta'
+
+  filter_legitimate:
+    Image|endswith:
+      - '\7z.exe'
+      - '\winzip32.exe'
+      - '\winrar.exe'
+      - '\compress.exe'
+    TargetFilename|endswith:
+      - '.zip'
+      - '.7z'
+      - '.rar'
+      - '.gz'
+
+  condition: (high_entropy_write or entropy_spike or extension_change or ransom_note) and not filter_legitimate
+
+falsepositives:
+  - Legitimate compression/encryption tools (7-Zip, VeraCrypt, BitLocker)
+  - Backup encryption software (Veeam, Acronis encrypted backups)
+  - Development tools compiling/packaging binaries
+  - Video/audio encoding generating high-entropy media files
+
+level: critical
+tags:
+  - ransomware
+  - encryption
+  - entropy
+  - ransom_note
+  - t1486   # MITRE ATT&CK: Data Encrypted for Impact
+  - t1027   # MITRE ATT&CK: Obfuscated Files or Information
+
+references:
+  - https://attack.mitre.org/techniques/T1486/
+  - https://en.wikipedia.org/wiki/Entropy_(information_theory)
+  - https://docs.resilience-forge.com/vigil/detections/entropy-spike
+
+# DRRA-specific enrichment
+enrichment:
+  entropy_baseline: true       # Compare against historical entropy for this path
+  vss_check: true              # Has recovery been disabled?
+  process_parent: true         # What spawned the writing process?
+  mass_modification: true      # Is mass file modification also occurring?
+  c2_check: true               # Is there concurrent outbound C2 traffic?
+
+# DRRA response mapping
+response:
+  shield_action: isolate_immediately
+  alert_level: P1
+  notify: soc_team
+  trigger_recovery: true       # Immediately prepare snapshot restore
+  preserve_evidence: true
