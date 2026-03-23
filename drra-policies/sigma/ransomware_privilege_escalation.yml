@@ -1,0 +1,67 @@
+title: Ransomware - Privilege Escalation Attempt
+id: 45h78901-defg-4567-hi89-012345678901
+description: Detects privilege escalation techniques used by ransomware to gain SYSTEM or admin access — token impersonation, UAC bypass, and suspicious service creation.
+status: experimental
+author: Resilience Forge Team
+date: 2026/03/23
+
+logsource:
+  category: process_creation
+  product: windows
+  service: sysmon
+
+detection:
+  token_impersonation:
+    EventID: 4672
+    PrivilegeList|contains:
+      - 'SeDebugPrivilege'
+      - 'SeImpersonatePrivilege'
+      - 'SeTakeOwnershipPrivilege'
+
+  uac_bypass:
+    Image|endswith:
+      - '\fodhelper.exe'
+      - '\eventvwr.exe'
+      - '\sdclt.exe'
+    ParentCommandLine|contains: 'powershell'
+
+  service_creation:
+    EventID: 7045
+    ServiceType: 'kernel mode driver'
+    ServiceStartType: 'demand start'
+
+  suspicious_parent:
+    ParentImage|endswith:
+      - '\winword.exe'
+      - '\excel.exe'
+      - '\outlook.exe'
+    Image|endswith:
+      - '\cmd.exe'
+      - '\powershell.exe'
+      - '\wscript.exe'
+
+  condition: token_impersonation or uac_bypass or (service_creation and suspicious_parent)
+
+falsepositives:
+  - Security tools requiring debug privileges
+  - Legitimate software installers requiring elevation
+  - Remote management software
+
+level: critical
+tags:
+  - ransomware
+  - privilege_escalation
+  - uac_bypass
+  - token_impersonation
+  - t1548  # MITRE ATT&CK: Abuse Elevation Control Mechanism
+  - t1134  # MITRE ATT&CK: Access Token Manipulation
+
+references:
+  - https://attack.mitre.org/techniques/T1548/
+  - https://attack.mitre.org/techniques/T1134/
+  - https://docs.resilience-forge.com/vigil/detections/privilege-escalation
+
+enrichment:
+  immediate_alert: true
+  alert_shield_for_isolation: true
+  preserve_forensics: true
