@@ -62,7 +62,7 @@ Vendor-agnostic policy definitions for Resilience Forge ransomware detection, co
 ```
 ┌─────────────────────────────────────────────────────────────┐
 │                   INCIDENT DETECTED                         │
-│           (Sigma rules + Sentinel ML engine)                │
+│           (Sigma rules + Vigil ML engine)                │
 └────────────────────┬────────────────────────────────────────┘
                      │ [Detection Playbook]
                      ▼
@@ -124,7 +124,7 @@ Vendor-agnostic policy definitions for Resilience Forge ransomware detection, co
 
 | Phase | Component | Target | Principle |
 |-------|-----------|--------|-----------|
-| **Detect** | Sigma + Sentinel | < 1s | Defense-in-Depth |
+| **Detect** | Sigma + Vigil | < 1s | Defense-in-Depth |
 | **Isolate** | Shield + OPA | < 3s | Automated Response |
 | **Preserve** | MinIO | 100% immutable | Immutability First |
 | **Recover** | Shield + Snapshot | < 60m | Graceful Degradation |
@@ -135,7 +135,7 @@ Vendor-agnostic policy definitions for Resilience Forge ransomware detection, co
 
 ## Integration Points
 
-### With Sentinel (ML Detection Engine)
+### With Vigil (ML Detection Engine)
 - Sigma rules operationalize ML detections
 - Behavioral patterns → Detection triggers
 - Entropy analysis → File modification classification
@@ -153,7 +153,7 @@ Vendor-agnostic policy definitions for Resilience Forge ransomware detection, co
 ### With CI/CD Pipeline
 ```bash
 # Pre-commit: Semgrep validates code
-semgrep --config=drra-policies/semgrep/ backend/ sentinel/ shield/
+semgrep --config=drra-policies/semgrep/ backend/ vigil/ shield/
 
 # Pre-deployment: OPA validates infrastructure
 opa eval -d drra-policies/opa/ infrastructure.json

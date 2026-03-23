@@ -23,7 +23,7 @@
         └────────────────┬────────────────┘
                          │
         ┌────────────────▼────────────────┐
-        │  SENTINEL (Detection Engine)    │
+        │  VIGIL (Detection Engine)    │
         │  - Analyze events               │
         │  - Calculate entropy            │
         │  - Detect patterns              │
@@ -70,10 +70,10 @@ $env:PYTHONPATH = "."; pytest tests/test_services.py::TestForgeService::test_ker
 
 ---
 
-#### **Test Sentinel Detection Engine**
+#### **Test Vigil Detection Engine**
 ```bash
 # Test threat detection
-$env:PYTHONPATH = "."; pytest tests/test_services.py::TestSentinelService::test_record_detection_event -v
+$env:PYTHONPATH = "."; pytest tests/test_services.py::TestVigilService::test_record_detection_event -v
 
 # Test behavior pattern detection
 $env:PYTHONPATH = "."; pytest tests/test_services.py::TestBehaviorPatternDetector -v
@@ -83,7 +83,7 @@ $env:PYTHONPATH = "."; pytest tests/test_services.py::TestBehaviorPatternDetecto
 ```
 
 **What it tests:**
-- Does Sentinel record threats correctly?
+- Does Vigil record threats correctly?
 - Can it detect mass file modifications?
 - Can it identify encryption via entropy?
 
@@ -118,7 +118,7 @@ $env:PYTHONPATH = "."; pytest tests/test_services.py::TestIntegration::test_end_
 
 **What it tests:**
 1. Forge deploys attack payload
-2. Sentinel detects threat
+2. Vigil detects threat
 3. Shield isolates resources
 4. Recovery task is created
 
@@ -182,14 +182,14 @@ $event = @{
     details = @{}
 } | ConvertTo-Json
 
-curl -X POST http://localhost:8000/api/v1/sentinel/events `
+curl -X POST http://localhost:8000/api/v1/vigil/events `
   -Headers @{"Content-Type"="application/json"} `
   -Body $event
 ```
 
 **5. Get Detection Events**
 ```bash
-curl http://localhost:8000/api/v1/sentinel/events?limit=10
+curl http://localhost:8000/api/v1/vigil/events?limit=10
 ```
 
 **6. Isolate Resource**
@@ -259,16 +259,16 @@ async def test_workflow():
 asyncio.run(test_workflow())
 ```
 
-#### **Step 2: Detect Threats via Sentinel**
+#### **Step 2: Detect Threats via Vigil**
 ```python
 import asyncio
 from backend.services.vigil_service import VigilService
 
 async def test_detection():
-    sentinel = SentinelService()
+    vigil = VigilService()
     
     # Record event
-    event_id = await sentinel.record_detection_event(
+    event_id = await vigil.record_detection_event(
         threat_type="mass_modification",
         threat_level="critical",
         affected_path="/tmp/honeypot",
@@ -280,7 +280,7 @@ async def test_detection():
     print(f"✅ Threat detected: {event_id}")
     
     # Get insights
-    insight = await sentinel.generate_llm_insight(event_id)
+    insight = await vigil.generate_llm_insight(event_id)
     print(f"✅ LLM Insight: {insight['threat_summary']}")
 
 asyncio.run(test_detection())
@@ -320,9 +320,9 @@ asyncio.run(test_recovery())
 |------|---------|-----------|
 | `test_deploy_payload` | Forge simulates attacks | Payload lifecycle management |
 | `test_generate_honeypot` | Forge creates trap files | File generation works |
-| `test_record_detection_event` | Sentinel logs threats | Event recording pipeline |
-| `test_detect_mass_modification` | Sentinel identifies patterns | ML detection algorithms |
-| `test_detect_encryption_attempt` | Sentinel analyzes entropy | Encryption detection |
+| `test_record_detection_event` | Vigil logs threats | Event recording pipeline |
+| `test_detect_mass_modification` | Vigil identifies patterns | ML detection algorithms |
+| `test_detect_encryption_attempt` | Vigil analyzes entropy | Encryption detection |
 | `test_trigger_isolation` | Shield responds immediately | Auto-remediation works |
 | `test_create_recovery_task` | Shield orchestrates recovery | Recovery workflows |
 | `test_end_to_end_threat_detection_and_response` | Complete workflow | Full system integration |
@@ -346,8 +346,8 @@ $env:PYTHONPATH = "."; pytest tests/test_services.py -v -m "not slow"
 # Forge only
 $env:PYTHONPATH = "."; pytest tests/test_services.py::TestForgeService -v
 
-# Sentinel only
-$env:PYTHONPATH = "."; pytest tests/test_services.py::TestSentinelService -v
+# Vigil only
+$env:PYTHONPATH = "."; pytest tests/test_services.py::TestVigilService -v
 
 # Shield only
 $env:PYTHONPATH = "."; pytest tests/test_services.py::TestShieldService -v
