@@ -1,0 +1,117 @@
+title: Ransomware - Command & Control Communication
+id: 9d2e4f78-cdef-3456-hi89-012345678901
+description: >
+  Detects outbound network connections consistent with ransomware C2 beaconing.
+  Covers DNS over HTTPS (DoH) abuse, Tor exit node connections, high-frequency
+  beaconing intervals, and connections to known ransomware infrastructure ports.
+  Ransomware operators use C2 to deliver encryption keys, exfiltrate data, and
+  receive commands during an attack.
+status: experimental
+author: Resilience Forge Team
+date: 2026/03/21
+
+logsource:
+  category: network_connection
+  product: windows
+  service: sysmon
+
+detection:
+  # Suspicious process initiating outbound connection
+  suspicious_initiator:
+    Image|endswith:
+      - '\powershell.exe'
+      - '\pwsh.exe'
+      - '\cmd.exe'
+      - '\wscript.exe'
+      - '\cscript.exe'
+      - '\mshta.exe'
+      - '\regsvr32.exe'
+      - '\rundll32.exe'
+    Initiated: 'true'
+
+  # Non-browser process connecting on HTTPS/HTTP
+  unexpected_https:
+    Image|endswith:
+      - '\svchost.exe'
+      - '\explorer.exe'
+    DestinationPort:
+      - 443
+      - 80
+      - 8080
+      - 8443
+    Initiated: 'true'
+
+  # DNS over HTTPS abuse (bypasses standard DNS monitoring)
+  doh_abuse:
+    Image|endswith:
+      - '\powershell.exe'
+      - '\cmd.exe'
+    DestinationHostname|contains:
+      - 'dns.google'
+      - 'cloudflare-dns.com'
+      - '1.1.1.1'
+      - '8.8.8.8'
+    DestinationPort: 443
+
+  # Tor-related ports
+  tor_ports:
+    DestinationPort:
+      - 9001
+      - 9030
+      - 9050
+      - 9051
+
+  # High-frequency beaconing (>10 connections/min to same destination)
+  beaconing:
+    EventID: 3
+    ConnectionFrequency|gt: 10
+    TimeframeWindow: 60s
+
+  filter_legitimate:
+    Image|endswith:
+      - '\chrome.exe'
+      - '\firefox.exe'
+      - '\msedge.exe'
+      - '\iexplore.exe'
+      - '\OneDrive.exe'
+      - '\Teams.exe'
+      - '\outlook.exe'
+
+  condition: (suspicious_initiator or unexpected_https or doh_abuse or tor_ports or beaconing) and not filter_legitimate
+
+falsepositives:
+  - Security tools performing threat intelligence lookups
+  - Legitimate administrative scripts (Ansible, Puppet)
+  - Software update mechanisms
+  - Remote management tools (RMM agents)
+
+level: high
+tags:
+  - ransomware
+  - c2
+  - exfiltration
+  - beaconing
+  - t1071   # MITRE ATT&CK: Application Layer Protocol
+  - t1048   # MITRE ATT&CK: Exfiltration Over Alternative Protocol
+  - t1090   # MITRE ATT&CK: Proxy (Tor)
+  - t1572   # MITRE ATT&CK: Protocol Tunneling
+
+references:
+  - https://attack.mitre.org/techniques/T1071/
+  - https://attack.mitre.org/techniques/T1048/
+  - https://docs.resilience-forge.com/vigil/detections/c2-communication
+
+# DRRA-specific enrichment
+enrichment:
+  entropy_check: true          # Is file encryption already in progress?
+  vss_check: true              # Has VSS been deleted?
+  mass_modification: true      # Is mass file modification occurring?
+  threat_intel_lookup: true    # Cross-reference destination IP with threat feeds
+  dns_resolution: true         # Resolve destination hostnames
+
+# DRRA response mapping
+response:
+  shield_action: block_outbound_and_isolate
+  alert_level: P1
+  notify: soc_team
+  preserve_pcap: true
