@@ -186,6 +186,10 @@ spec:
           storage: "50Gi"
 
 ---
+# Generate secrets with:
+#   kubectl create secret generic postgres-secret \
+#     --from-literal=password=$POSTGRES_PASSWORD \
+#     --namespace=resilience-forge
 apiVersion: v1
 kind: Secret
 metadata:
@@ -193,9 +197,13 @@ metadata:
   namespace: resilience-forge
 type: Opaque
 stringData:
-  password: drra_secure_password
+  password: "${POSTGRES_PASSWORD}"
 
 ---
+# Generate secrets with:
+#   kubectl create secret generic minio-secret \
+#     --from-literal=password=$MINIO_ROOT_PASSWORD \
+#     --namespace=resilience-forge
 apiVersion: v1
 kind: Secret
 metadata:
@@ -203,7 +211,7 @@ metadata:
   namespace: resilience-forge
 type: Opaque
 stringData:
-  password: minioadmin
+  password: "${MINIO_ROOT_PASSWORD}"
 
 ---
 apiVersion: autoscaling/v2
