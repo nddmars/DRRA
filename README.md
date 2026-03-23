@@ -1,5 +1,6 @@
 # Resilience Forge (DRRA)
-## Damn Resilient Ransomware App
+## Distributed Resilience & Recovery Architecture
+> *"Because damn resilient systems don't pay ransoms."*
 
 **The industry standard for architecting, testing, and validating ransomware-proof ecosystems through automation and AI.**
 

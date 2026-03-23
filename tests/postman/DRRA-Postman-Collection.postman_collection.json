@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "drra-collection-2026",
     "name": "Resilience Forge (DRRA) - API Collection",
-    "description": "Complete API test collection for Damn Resilient Ransomware App",
+    "description": "Complete API test collection for Distributed Resilience & Recovery Architecture",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
