@@ -650,13 +650,13 @@
               <td><strong>Dashboard</strong></td>
               <td><a class="service-link" href="http://localhost:7700" target="_blank">http://localhost:7700</a></td>
               <td>React + TypeScript</td>
-              <td>Defensibility Index, MTTC tracker, incident timeline</td>
+              <td><strong>Business/SOC view</strong> — Defensibility Index, MTTC, incident cards, threat feed. Audience: CISOs, analysts, auditors.</td>
             </tr>
             <tr>
               <td><strong>Grafana</strong></td>
               <td><a class="service-link" href="http://localhost:7600" target="_blank">http://localhost:7600</a></td>
               <td>Grafana OSS</td>
-              <td>Live metrics dashboards &amp; alerting</td>
+              <td><strong>Engineering/Ops view</strong> — Raw time-series metrics, Kafka throughput, API latency, container health. Audience: DevOps, on-call engineers.</td>
             </tr>
             <tr>
               <td><strong>Prometheus</strong></td>
@@ -934,6 +934,14 @@ Restoration Complete → Metrics Updated
           <h2 style="color:var(--dashboard);margin-top:0">&#x1F4CA; The Dashboard — Control Center</h2>
           <p><strong>Directory</strong>: <code>dashboard/</code> &nbsp;|&nbsp; <strong>URL</strong>: <a href="http://localhost:7700">http://localhost:7700</a></p>
           <p>Real-time monitoring, analysis, and configuration. The Dashboard aggregates data from all three pillars to compute the Defensibility Index and provide a single pane of glass.</p>
+
+          <div class="card" style="background:var(--bg3);border-left:3px solid var(--warn);margin-bottom:1.5rem;padding:1rem">
+            <strong>Two monitoring interfaces — different audiences:</strong>
+            <ul style="margin-top:0.5rem;margin-bottom:0">
+              <li><strong>React Dashboard</strong> (<a href="http://localhost:7700">:7700</a>) — <em>Business/SOC view.</em> Defensibility Index, MTTC, incident cards, threat feed. Designed for CISOs, analysts, and auditors who need outcome-focused visibility.</li>
+              <li><strong>Grafana</strong> (<a href="http://localhost:7600">:7600</a>) — <em>Engineering/Ops view.</em> Raw time-series metrics, Kafka throughput, API latency, container health. Designed for DevOps and on-call engineers who need infrastructure visibility.</li>
+            </ul>
+          </div>
 
           <div class="two-col">
             <div>
@@ -1498,8 +1506,8 @@ logs:
           <tbody>
             <tr><td><strong>Backend API</strong></td><td><a class="service-link" href="http://localhost:8000">http://localhost:8000</a></td><td>FastAPI core — all component routes</td></tr>
             <tr><td><strong>Swagger UI</strong></td><td><a class="service-link" href="http://localhost:8000/docs">http://localhost:8000/docs</a></td><td>Interactive API documentation</td></tr>
-            <tr><td><strong>Dashboard</strong></td><td><a class="service-link" href="http://localhost:7700">http://localhost:7700</a></td><td>React frontend — Defensibility Index &amp; MTTC</td></tr>
-            <tr><td><strong>Grafana</strong></td><td><a class="service-link" href="http://localhost:7600">http://localhost:7600</a></td><td>Live metrics &amp; alerting (admin/admin)</td></tr>
+            <tr><td><strong>Dashboard</strong></td><td><a class="service-link" href="http://localhost:7700">http://localhost:7700</a></td><td>React frontend — Business/SOC view: Defensibility Index, MTTC, incident cards (for CISOs &amp; analysts)</td></tr>
+            <tr><td><strong>Grafana</strong></td><td><a class="service-link" href="http://localhost:7600">http://localhost:7600</a></td><td>Engineering/Ops view: raw metrics, Kafka throughput, container health (admin/admin)</td></tr>
             <tr><td><strong>Prometheus</strong></td><td><a class="service-link" href="http://localhost:7500">http://localhost:7500</a></td><td>Metrics collection &amp; time-series storage</td></tr>
             <tr><td><strong>MinIO Console</strong></td><td><a class="service-link" href="http://localhost:7001">http://localhost:7001</a></td><td>Immutable object storage (minioadmin/minioadmin)</td></tr>
             <tr><td><strong>Kafka</strong></td><td><code>localhost:7300</code></td><td>Event streaming for telemetry pipeline</td></tr>

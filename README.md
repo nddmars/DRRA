@@ -46,8 +46,8 @@ Then open `docs/index.html` for full setup instructions.
 |---------|-----|-------------|
 | Backend API | http://localhost:8000 | FastAPI — all component routes |
 | Swagger UI | http://localhost:8000/docs | Interactive API documentation |
-| Dashboard | http://localhost:7700 | React frontend — Defensibility Index & MTTC |
-| Grafana | http://localhost:7600 | Live metrics & alerting (admin/admin) |
+| Dashboard | http://localhost:7700 | **Business/SOC view** — Defensibility Index, MTTC, incident cards (CISOs & analysts) |
+| Grafana | http://localhost:7600 | **Engineering/Ops view** — Raw metrics, Kafka throughput, container health (admin/admin) |
 | Prometheus | http://localhost:7500 | Metrics collection & time-series storage |
 | MinIO Console | http://localhost:7001 | Immutable object storage (minioadmin/minioadmin) |
 | Kafka | localhost:7300 | Event streaming for telemetry pipeline |
