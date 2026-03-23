@@ -102,3 +102,6 @@ htmlcov/
 node_modules/
 dist/
 *.tsbuildinfo
+
+# Claude Code internal files
+.claude/
