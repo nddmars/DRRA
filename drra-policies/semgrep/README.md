@@ -1,6 +1,6 @@
 # Semgrep Rules - Secure Coding & Resilience Patterns
 
-Catch security issues and enforce resilience patterns in Forge, Sentinel, and Shield code during development.
+Catch security issues and enforce resilience patterns in Forge, Vigil, and Shield code during development.
 
 ## Rule Categories
 
@@ -24,10 +24,10 @@ Prevent weak cipher usage, random number generation issues, key management failu
 - `crypto_fixed_seeds.py` – Prevents seed-based PRNG compromise
 - `crypto_key_in_code.py` – Detects hardcoded API keys, credentials
 
-**Enforcement**: Sentinel ML models must use strong hashing for entropy calculations.
+**Enforcement**: Vigil ML models must use strong hashing for entropy calculations.
 
 ### 3. Input Validation
-Prevent injection attacks and path traversal in Forge/Sentinel.
+Prevent injection attacks and path traversal in Forge/Vigil.
 
 **Rules**:
 - `validation_sql_injection.py` – Detects unsafe SQL concatenation
@@ -52,7 +52,7 @@ Enforce defensive coding to prevent system compromise during incident response.
 
 ### Scan Repository
 ```bash
-semgrep --config=drra-policies/semgrep/ backend/ sentinel/ shield/
+semgrep --config=drra-policies/semgrep/ backend/ vigil/ shield/
 ```
 
 ### Add to Pre-commit

@@ -43,11 +43,11 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 | Service | URL |
 |---------|-----|
 | **API Docs** | http://localhost:8000/docs |
-| **Dashboard** | http://localhost:3000 |
-| **MinIO Console** | http://localhost:9001 |
-| **Prometheus** | http://localhost:9090 |
-| **Grafana** | http://localhost:3000 |
-| **Kafka** | localhost:9092 |
+| **Dashboard** | http://localhost:7700 |
+| **MinIO Console** | http://localhost:7001 |
+| **Prometheus** | http://localhost:7500 |
+| **Grafana** | http://localhost:7600 |
+| **Kafka** | localhost:7300 |
 
 **Default Credentials:**
 - MinIO: `minioadmin` / `minioadmin`
@@ -83,7 +83,7 @@ curl -X POST "http://localhost:8000/api/v1/forge/honeypot/generate" \
 
 ### 3. Simulate Detection
 ```bash
-curl -X POST "http://localhost:8000/api/v1/sentinel/events" \
+curl -X POST "http://localhost:8000/api/v1/vigil/events" \
   -H "Content-Type: application/json" \
   -d '{
     "event_id": "test_evt_001",
@@ -220,7 +220,7 @@ docker exec -it $(docker ps -q -f "ancestor=minio/minio") \
 1. **Read Architecture Guide**: [docs/ARCHITECTURE.md](../docs/ARCHITECTURE.md)
 2. **Deploy to Kubernetes**: Follow [infra/kubernetes/](../infra/kubernetes/)
 3. **Integrate with SOAR**: See [infra/shuffle/](../infra/shuffle/)
-4. **Custom ML Models**: Add to [sentinel/models/](../sentinel/models/)
+4. **Custom ML Models**: Add to [vigil/models/](../vigil/models/)
 5. **Contribute**: See [docs/CONTRIBUTING.md](../docs/CONTRIBUTING.md)
 
 ---
@@ -287,10 +287,10 @@ Your Resilience Forge instance is now operational. Start building ransomware-pro
 curl http://localhost:8000/api/v1/dashboard/incidents
 
 # Get latest detection events
-curl http://localhost:8000/api/v1/sentinel/events
+curl http://localhost:8000/api/v1/vigil/events
 
 # View immutable telemetry
-curl http://localhost:8000/api/v1/sentinel/telemetry
+curl http://localhost:8000/api/v1/vigil/telemetry
 
 # Check system health
 curl http://localhost:8000/health

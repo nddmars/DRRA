@@ -1,0 +1,1505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Resilience Forge (DRRA) — Documentation</title>
+  <style>
+    /* ===== RESET & BASE ===== */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:        #0d1b2a;
+      --bg2:       #112233;
+      --bg3:       #162840;
+      --accent:    #008bff;
+      --accent2:   #00c3ff;
+      --text:      #e2eaf4;
+      --muted:     #7a9ab8;
+      --border:    #1e3a56;
+      --forge:     #e84040;
+      --vigil:     #008bff;
+      --shield:    #2adb72;
+      --dashboard: #a855f7;
+      --warn:      #f5a623;
+      --code-bg:   #091724;
+      --radius:    8px;
+      --sidebar-w: 260px;
+    }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      font-size: 15px;
+      line-height: 1.65;
+    }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { color: var(--accent2); text-decoration: underline; }
+    h1, h2, h3, h4 { line-height: 1.3; font-weight: 600; }
+    h1 { font-size: 2rem; }
+    h2 { font-size: 1.5rem; margin: 2rem 0 1rem; }
+    h3 { font-size: 1.2rem; margin: 1.5rem 0 0.75rem; color: var(--accent2); }
+    h4 { font-size: 1rem; margin: 1.2rem 0 0.5rem; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+    p { margin: 0 0 1rem; }
+    ul, ol { padding-left: 1.5rem; margin-bottom: 1rem; }
+    li { margin-bottom: .3rem; }
+    hr { border: none; border-top: 1px solid var(--border); margin: 2rem 0; }
+
+    /* ===== LAYOUT ===== */
+    #app { display: flex; min-height: 100vh; }
+
+    /* ===== SIDEBAR ===== */
+    #sidebar {
+      width: var(--sidebar-w);
+      min-width: var(--sidebar-w);
+      background: var(--bg2);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      position: fixed;
+      top: 0; left: 0; bottom: 0;
+      overflow-y: auto;
+      z-index: 100;
+      transition: transform .3s ease;
+    }
+    .sidebar-logo {
+      padding: 1.5rem 1.2rem 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .sidebar-logo .brand {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--accent);
+      letter-spacing: .03em;
+    }
+    .sidebar-logo .sub {
+      font-size: .75rem;
+      color: var(--muted);
+      margin-top: .2rem;
+    }
+    .sidebar-logo .badge {
+      display: inline-block;
+      background: var(--accent);
+      color: #fff;
+      font-size: .65rem;
+      font-weight: 700;
+      padding: .15rem .45rem;
+      border-radius: 3px;
+      margin-top: .4rem;
+      letter-spacing: .08em;
+    }
+    nav { padding: 1rem 0; flex: 1; }
+    nav .nav-section {
+      padding: .3rem 1.2rem .1rem;
+      font-size: .65rem;
+      font-weight: 700;
+      color: var(--muted);
+      letter-spacing: .12em;
+      text-transform: uppercase;
+      margin-top: .8rem;
+    }
+    nav a {
+      display: flex;
+      align-items: center;
+      gap: .6rem;
+      padding: .5rem 1.2rem;
+      color: var(--text);
+      font-size: .875rem;
+      border-left: 3px solid transparent;
+      transition: background .15s, border-color .15s, color .15s;
+    }
+    nav a:hover {
+      background: var(--bg3);
+      color: var(--accent2);
+      text-decoration: none;
+    }
+    nav a.active {
+      border-left-color: var(--accent);
+      background: rgba(0,139,255,.08);
+      color: var(--accent);
+    }
+    nav a .nav-icon { font-size: 1rem; flex-shrink: 0; }
+
+    /* ===== MAIN CONTENT ===== */
+    #main {
+      margin-left: var(--sidebar-w);
+      flex: 1;
+      min-width: 0;
+    }
+    /* Top bar */
+    #topbar {
+      position: sticky;
+      top: 0;
+      background: rgba(13,27,42,.9);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--border);
+      padding: .75rem 2rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      z-index: 50;
+    }
+    #topbar .page-title { font-size: 1rem; font-weight: 600; color: var(--muted); }
+    #hamburger {
+      display: none;
+      background: none; border: none;
+      color: var(--text); cursor: pointer;
+      font-size: 1.3rem; padding: .2rem .4rem;
+    }
+    .content { padding: 2.5rem 2.5rem 4rem; max-width: 960px; }
+
+    /* ===== SECTIONS ===== */
+    .section { display: none; }
+    .section.active { display: block; }
+
+    /* ===== CARDS ===== */
+    .card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .card.forge   { border-left: 4px solid var(--forge); }
+    .card.vigil   { border-left: 4px solid var(--vigil); }
+    .card.shield  { border-left: 4px solid var(--shield); }
+    .card.dashboard { border-left: 4px solid var(--dashboard); }
+
+    /* ===== HERO ===== */
+    .hero {
+      background: linear-gradient(135deg, var(--bg2) 0%, #0b2040 100%);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 2.5rem;
+      margin-bottom: 2rem;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: -40px; right: -40px;
+      width: 200px; height: 200px;
+      background: radial-gradient(circle, rgba(0,139,255,.15) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .hero h1 { margin-bottom: .5rem; }
+    .hero p  { color: var(--muted); margin-bottom: 1.2rem; max-width: 600px; }
+    .pill-group { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .5rem; }
+    .pill {
+      display: inline-flex; align-items: center; gap: .35rem;
+      padding: .3rem .8rem;
+      border-radius: 20px;
+      font-size: .8rem; font-weight: 600;
+    }
+    .pill.wall      { background: rgba(0,139,255,.15); color: var(--vigil); border: 1px solid rgba(0,139,255,.3); }
+    .pill.squat     { background: rgba(245,166,35,.15); color: var(--warn); border: 1px solid rgba(245,166,35,.3); }
+    .pill.grab      { background: rgba(42,219,114,.15); color: var(--shield); border: 1px solid rgba(42,219,114,.3); }
+    .pill.forge-p   { background: rgba(232,64,64,.15); color: var(--forge); border: 1px solid rgba(232,64,64,.3); }
+
+    /* ===== WSG PILLARS ===== */
+    .pillar-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 1rem;
+      margin: 1.5rem 0;
+    }
+    .pillar {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      position: relative;
+    }
+    .pillar.wall    { border-top: 3px solid var(--vigil); }
+    .pillar.squat   { border-top: 3px solid var(--warn); }
+    .pillar.grab    { border-top: 3px solid var(--shield); }
+    .pillar .pillar-icon { font-size: 1.8rem; margin-bottom: .5rem; }
+    .pillar h3 { margin: .3rem 0 .5rem; font-size: 1rem; }
+    .pillar p  { font-size: .85rem; color: var(--muted); margin: 0; }
+
+    /* ===== ARCHITECTURE DIAGRAM ===== */
+    .arch-diagram {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 2rem;
+      margin: 1.5rem 0;
+      font-family: 'Courier New', monospace;
+      font-size: .8rem;
+      overflow-x: auto;
+    }
+    .arch-diagram .row { display: flex; align-items: stretch; gap: 1rem; margin-bottom: 1rem; justify-content: center; }
+    .arch-box {
+      border: 1px solid;
+      border-radius: 6px;
+      padding: .75rem 1rem;
+      text-align: center;
+      font-weight: 600;
+      font-size: .8rem;
+      min-width: 140px;
+    }
+    .arch-box.dash   { border-color: var(--dashboard); color: var(--dashboard); background: rgba(168,85,247,.08); flex: 1; max-width: 600px; }
+    .arch-box.fg     { border-color: var(--forge); color: var(--forge); background: rgba(232,64,64,.08); }
+    .arch-box.vi     { border-color: var(--vigil); color: var(--vigil); background: rgba(0,139,255,.08); }
+    .arch-box.sh     { border-color: var(--shield); color: var(--shield); background: rgba(42,219,114,.08); }
+    .arch-box.watch  { border-color: var(--warn); color: var(--warn); background: rgba(245,166,35,.08); flex: 1; max-width: 600px; }
+    .arch-box.infra  { border-color: var(--muted); color: var(--muted); background: rgba(122,154,184,.06); flex: 1; max-width: 600px; }
+    .arch-arrow { text-align: center; color: var(--muted); font-size: 1.2rem; line-height: 1; }
+    .arch-box .sub { font-size: .7rem; font-weight: 400; color: var(--muted); margin-top: .4rem; }
+
+    /* ===== TABLES ===== */
+    table { width: 100%; border-collapse: collapse; margin: 1rem 0 1.5rem; font-size: .875rem; }
+    th {
+      background: var(--bg3);
+      color: var(--accent2);
+      padding: .6rem .9rem;
+      text-align: left;
+      font-size: .75rem;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      border-bottom: 2px solid var(--border);
+    }
+    td {
+      padding: .6rem .9rem;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    tr:hover td { background: rgba(255,255,255,.02); }
+
+    /* ===== CODE BLOCKS ===== */
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.2rem 1.5rem;
+      overflow-x: auto;
+      margin: .75rem 0 1.25rem;
+      font-size: .82rem;
+      line-height: 1.6;
+    }
+    code {
+      font-family: 'Courier New', 'Consolas', monospace;
+      font-size: .87em;
+    }
+    p code, li code, td code {
+      background: rgba(0,139,255,.12);
+      border: 1px solid rgba(0,139,255,.2);
+      border-radius: 3px;
+      padding: .1em .35em;
+      color: var(--accent2);
+    }
+
+    /* ===== METHOD BADGES ===== */
+    .badge {
+      display: inline-block;
+      padding: .15rem .5rem;
+      border-radius: 4px;
+      font-size: .7rem;
+      font-weight: 700;
+      letter-spacing: .05em;
+      text-transform: uppercase;
+      margin-right: .4rem;
+    }
+    .badge.get    { background: #0069cc; color: #fff; }
+    .badge.post   { background: #1a7a3c; color: #fff; }
+    .badge.put    { background: #7a4a0a; color: #fff; }
+    .badge.delete { background: #7a1a1a; color: #fff; }
+
+    /* ===== ENDPOINT BLOCK ===== */
+    .endpoint {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: .75rem 1rem;
+      margin-bottom: .6rem;
+      display: flex;
+      align-items: flex-start;
+      gap: .75rem;
+      flex-wrap: wrap;
+    }
+    .endpoint .path { font-family: 'Courier New', monospace; font-size: .85rem; color: var(--text); flex: 1; }
+    .endpoint .desc { font-size: .82rem; color: var(--muted); width: 100%; padding-left: 3.5rem; margin-top: .15rem; }
+
+    /* ===== SEVERITY BADGES ===== */
+    .sev { display: inline-block; padding: .15rem .55rem; border-radius: 4px; font-size: .72rem; font-weight: 700; }
+    .sev.critical { background: rgba(232,64,64,.2); color: #ff6b6b; border: 1px solid rgba(232,64,64,.4); }
+    .sev.high     { background: rgba(245,166,35,.2); color: #ffb84d; border: 1px solid rgba(245,166,35,.4); }
+    .sev.medium   { background: rgba(0,139,255,.2); color: #66b3ff; border: 1px solid rgba(0,139,255,.4); }
+
+    /* ===== SERVICE URL TABLE ===== */
+    .service-link { color: var(--accent); font-family: 'Courier New', monospace; font-size: .82rem; }
+
+    /* ===== STEP GUIDE ===== */
+    .steps { counter-reset: step; }
+    .step {
+      counter-increment: step;
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.2rem 1.5rem 1.2rem 4rem;
+      margin-bottom: 1rem;
+      position: relative;
+    }
+    .step::before {
+      content: counter(step);
+      position: absolute;
+      left: 1.2rem;
+      top: 1.1rem;
+      width: 1.8rem; height: 1.8rem;
+      background: var(--accent);
+      color: #fff;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: .8rem; font-weight: 700;
+    }
+    .step h4 { color: var(--text); text-transform: none; letter-spacing: 0; font-size: .95rem; margin: 0 0 .4rem; }
+
+    /* ===== DETECTION PATTERN GRID ===== */
+    .detect-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1rem;
+      margin: 1rem 0 1.5rem;
+    }
+    .detect-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.1rem;
+    }
+    .detect-card .detect-icon { font-size: 1.5rem; margin-bottom: .4rem; }
+    .detect-card h4 { color: var(--text); text-transform: none; letter-spacing: 0; font-size: .9rem; margin-bottom: .3rem; }
+    .detect-card .threshold { font-size: .8rem; color: var(--muted); margin-bottom: .5rem; }
+
+    /* ===== RESPONSIVE ===== */
+    @media (max-width: 768px) {
+      #sidebar {
+        transform: translateX(-100%);
+      }
+      #sidebar.open {
+        transform: translateX(0);
+      }
+      #main {
+        margin-left: 0;
+      }
+      #hamburger {
+        display: block;
+      }
+      .content { padding: 1.5rem 1rem 3rem; }
+      .arch-diagram .row { flex-direction: column; align-items: center; }
+      .arch-box.dash, .arch-box.watch, .arch-box.infra { max-width: 100%; }
+      .hero { padding: 1.5rem; }
+      h1 { font-size: 1.5rem; }
+      #overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 99; }
+      #overlay.open { display: block; }
+    }
+    @media (min-width: 769px) {
+      #overlay { display: none !important; }
+    }
+
+    /* ===== MISC ===== */
+    .tag {
+      display: inline-block;
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: .1rem .5rem;
+      font-size: .75rem;
+      color: var(--muted);
+      margin: .1rem;
+    }
+    .two-col {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    @media (max-width: 600px) { .two-col { grid-template-columns: 1fr; } }
+
+    .metric-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 1rem;
+      margin: 1rem 0 1.5rem;
+    }
+    .metric {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem;
+      text-align: center;
+    }
+    .metric .val { font-size: 1.6rem; font-weight: 700; color: var(--accent); }
+    .metric .lbl { font-size: .75rem; color: var(--muted); margin-top: .2rem; }
+    .metric.good  .val { color: var(--shield); }
+    .metric.crit  .val { color: var(--forge); }
+    .metric.warn  .val { color: var(--warn); }
+
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 1.5rem 2.5rem;
+      font-size: .8rem;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+
+<div id="overlay" onclick="closeSidebar()"></div>
+
+<div id="app">
+  <!-- SIDEBAR -->
+  <aside id="sidebar">
+    <div class="sidebar-logo">
+      <div class="brand">&#x1F525; Resilience Forge</div>
+      <div class="sub">DRRA — Damn Resilient Ransomware App</div>
+      <span class="badge">CONFERENCE EDITION</span>
+    </div>
+    <nav id="nav">
+      <div class="nav-section">Introduction</div>
+      <a href="#overview" class="nav-link active" onclick="navigate('overview',this)">
+        <span class="nav-icon">&#x1F3E0;</span> Overview
+      </a>
+      <a href="#architecture" class="nav-link" onclick="navigate('architecture',this)">
+        <span class="nav-icon">&#x1F5FA;</span> Architecture
+      </a>
+
+      <div class="nav-section">Components</div>
+      <a href="#components" class="nav-link" onclick="navigate('components',this)">
+        <span class="nav-icon">&#x1F9E9;</span> Components
+      </a>
+      <a href="#api" class="nav-link" onclick="navigate('api',this)">
+        <span class="nav-icon">&#x26A1;</span> API Reference
+      </a>
+
+      <div class="nav-section">Detection</div>
+      <a href="#detection" class="nav-link" onclick="navigate('detection',this)">
+        <span class="nav-icon">&#x1F50D;</span> Detection Engine
+      </a>
+
+      <div class="nav-section">Getting Started</div>
+      <a href="#quickstart" class="nav-link" onclick="navigate('quickstart',this)">
+        <span class="nav-icon">&#x1F680;</span> Quick Start
+      </a>
+    </nav>
+  </aside>
+
+  <!-- MAIN -->
+  <div id="main">
+    <div id="topbar">
+      <button id="hamburger" onclick="toggleSidebar()" aria-label="Toggle menu">&#9776;</button>
+      <span class="page-title" id="page-title">Overview</span>
+      <span style="font-size:.75rem;color:var(--muted);">DRRA v2.0</span>
+    </div>
+
+    <div class="content">
+
+      <!-- ========== OVERVIEW ========== -->
+      <section id="overview" class="section active">
+        <div class="hero">
+          <h1>Resilience Forge <span style="color:var(--muted);font-weight:400;font-size:1.2rem">(DRRA)</span></h1>
+          <p>Damn Resilient Ransomware App — The industry standard for architecting, testing, and validating ransomware-proof ecosystems through automation and AI.</p>
+          <div class="pill-group">
+            <span class="pill wall">&#x1F535; WALL — PREVENT</span>
+            <span class="pill squat">&#x1F7E1; SQUAT — SURVIVE</span>
+            <span class="pill grab">&#x1F534; GRAB — CONTROL</span>
+            <span class="pill forge-p">&#x1F525; FORGE — SIMULATE</span>
+          </div>
+        </div>
+
+        <h2>What is DRRA?</h2>
+        <p>Resilience Forge is an open-source <strong>"Assume Breach"</strong> laboratory that provides a controlled playground where security engineers can build, test, and validate ransomware defenses. Unlike traditional security tools that focus on prevention alone, DRRA implements the <strong>WALL-SQUAT-GRAB</strong> framework — a three-pillar approach designed to detect threats, contain their blast radius, and recover with zero data loss.</p>
+        <p>The system is built around the concept of the <strong>Defensibility Index (DI)</strong> — a 0–100 score measuring how well your infrastructure would survive a real ransomware attack. Higher is better.</p>
+
+        <h2>The WALL-SQUAT-GRAB Framework</h2>
+        <div class="pillar-grid">
+          <div class="pillar wall">
+            <div class="pillar-icon">&#x1F535;</div>
+            <h3>WALL — PREVENT</h3>
+            <p><strong>Component: Vigil</strong></p>
+            <p>AI-driven behavioral detection identifies threats before encryption spreads. Entropy analysis, mass modification detection, and lateral movement tracking using ML-based pattern recognition.</p>
+          </div>
+          <div class="pillar squat">
+            <div class="pillar-icon">&#x1F7E1;</div>
+            <h3>SQUAT — SURVIVE</h3>
+            <p><strong>Component: Shield (Contain)</strong></p>
+            <p>SOAR automation and rapid response limits blast radius. Dynamic micro-segmentation isolates compromised systems in &lt;30 seconds, preventing lateral spread.</p>
+          </div>
+          <div class="pillar grab">
+            <div class="pillar-icon">&#x1F7E2;</div>
+            <h3>GRAB — CONTROL</h3>
+            <p><strong>Component: Shield (Recover)</strong></p>
+            <p>Immutable backups ensure recovery capability. Verified backup restoration validates data integrity with automated failover to known-good state.</p>
+          </div>
+        </div>
+
+        <h2>Key Metrics</h2>
+        <div class="metric-row">
+          <div class="metric good">
+            <div class="val">&lt; 60s</div>
+            <div class="lbl">Target MTTC</div>
+          </div>
+          <div class="metric good">
+            <div class="val">&lt; 0.1%</div>
+            <div class="lbl">Max Data Loss</div>
+          </div>
+          <div class="metric good">
+            <div class="val">99.9%+</div>
+            <div class="lbl">Recovery Success</div>
+          </div>
+          <div class="metric warn">
+            <div class="val">0.85</div>
+            <div class="lbl">Entropy Threshold</div>
+          </div>
+          <div class="metric crit">
+            <div class="val">15%</div>
+            <div class="lbl">Mass Mod Threshold</div>
+          </div>
+          <div class="metric">
+            <div class="val">365d</div>
+            <div class="lbl">Log Retention</div>
+          </div>
+        </div>
+
+        <h2>Technology Stack</h2>
+        <table>
+          <thead><tr><th>Component</th><th>Technology</th><th>Purpose</th></tr></thead>
+          <tbody>
+            <tr><td>Backend API</td><td><code>Python + FastAPI</code></td><td>Async REST API core</td></tr>
+            <tr><td>Detection ML</td><td><code>scikit-learn, TensorFlow</code></td><td>Behavioral pattern analysis</td></tr>
+            <tr><td>LLM Integration</td><td><code>Google Gemini 2.5 Flash</code></td><td>Attack summarization &amp; insights</td></tr>
+            <tr><td>File Monitoring</td><td><code>Rust + tokio + rayon</code></td><td>Sub-millisecond event detection</td></tr>
+            <tr><td>Immutable Storage</td><td><code>MinIO + Object Lock</code></td><td>S3-compatible write-once logs</td></tr>
+            <tr><td>Event Streaming</td><td><code>Apache Kafka</code></td><td>Real-time telemetry pipeline</td></tr>
+            <tr><td>Database</td><td><code>PostgreSQL + SQLAlchemy</code></td><td>Structured audit logs</td></tr>
+            <tr><td>Caching</td><td><code>Redis</code></td><td>Sessions &amp; rate limiting</td></tr>
+            <tr><td>Frontend</td><td><code>React + TypeScript</code></td><td>Dashboard &amp; visualization</td></tr>
+            <tr><td>Metrics</td><td><code>Prometheus + Grafana</code></td><td>Observability stack</td></tr>
+            <tr><td>Orchestration</td><td><code>Ansible + Docker Compose</code></td><td>Infrastructure as code</td></tr>
+          </tbody>
+        </table>
+      </section>
+
+      <!-- ========== ARCHITECTURE ========== -->
+      <section id="architecture" class="section">
+        <h1>Architecture</h1>
+        <p>Resilience Forge follows a distributed, defense-in-depth architecture with five core service layers communicating through event-driven patterns.</p>
+
+        <h2>System Diagram</h2>
+        <div class="arch-diagram">
+          <div class="row">
+            <div class="arch-box dash">
+              DASHBOARD (Control Center)
+              <div class="sub">Defensibility Index · MTTC · Incident Timeline · Configuration Studio</div>
+            </div>
+          </div>
+          <div class="arch-arrow">&#x2193;</div>
+          <div class="row">
+            <div class="arch-box fg">
+              THE FORGE
+              <div class="sub">Testing &amp; Simulation<br>Honeypots · Payloads · Identity Tests</div>
+            </div>
+            <div class="arch-box vi">
+              VIGIL
+              <div class="sub">WALL / PREVENT<br>ML Engine · Entropy · Behavior</div>
+            </div>
+            <div class="arch-box sh">
+              THE SHIELD
+              <div class="sub">SQUAT + GRAB<br>Isolation · Lock · Recovery</div>
+            </div>
+          </div>
+          <div class="arch-arrow">&#x2193;</div>
+          <div class="row">
+            <div class="arch-box watch">
+              WATCHER (Rust — Real-time File System Monitor)
+              <div class="sub">Sub-ms latency · Entropy spike detection · Mass modification tracking</div>
+            </div>
+          </div>
+          <div class="arch-arrow">&#x2193;</div>
+          <div class="row">
+            <div class="arch-box infra">
+              IMMUTABLE FOUNDATION — MinIO (Object Lock) + PostgreSQL + Kafka + Redis
+              <div class="sub">Write-once storage · Tamper-proof audit logs · 365-day retention · HIPAA / PCI-DSS / SOC2</div>
+            </div>
+          </div>
+        </div>
+
+        <h2>All Services</h2>
+        <table>
+          <thead><tr><th>Service</th><th>URL / Port</th><th>Technology</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><strong>Backend API</strong></td>
+              <td><a class="service-link" href="http://localhost:8000" target="_blank">http://localhost:8000</a></td>
+              <td>FastAPI + Python</td>
+              <td>Core API — FORGE, VIGIL, SHIELD, DASHBOARD routes</td>
+            </tr>
+            <tr>
+              <td><strong>Swagger UI</strong></td>
+              <td><a class="service-link" href="http://localhost:8000/docs" target="_blank">http://localhost:8000/docs</a></td>
+              <td>OpenAPI 3.0</td>
+              <td>Interactive API documentation &amp; testing</td>
+            </tr>
+            <tr>
+              <td><strong>Dashboard</strong></td>
+              <td><a class="service-link" href="http://localhost:7700" target="_blank">http://localhost:7700</a></td>
+              <td>React + TypeScript</td>
+              <td>Defensibility Index, MTTC tracker, incident timeline</td>
+            </tr>
+            <tr>
+              <td><strong>Grafana</strong></td>
+              <td><a class="service-link" href="http://localhost:7600" target="_blank">http://localhost:7600</a></td>
+              <td>Grafana OSS</td>
+              <td>Live metrics dashboards &amp; alerting</td>
+            </tr>
+            <tr>
+              <td><strong>Prometheus</strong></td>
+              <td><a class="service-link" href="http://localhost:7500" target="_blank">http://localhost:7500</a></td>
+              <td>Prometheus</td>
+              <td>Metrics scraping &amp; time-series storage</td>
+            </tr>
+            <tr>
+              <td><strong>MinIO</strong></td>
+              <td><a class="service-link" href="http://localhost:7001" target="_blank">http://localhost:7001</a></td>
+              <td>MinIO</td>
+              <td>Immutable object storage (S3-compatible, Object Lock)</td>
+            </tr>
+            <tr>
+              <td><strong>Kafka</strong></td>
+              <td><code>localhost:7300</code></td>
+              <td>Apache Kafka</td>
+              <td>Event streaming for telemetry pipeline</td>
+            </tr>
+            <tr>
+              <td><strong>PostgreSQL</strong></td>
+              <td><code>localhost:7100</code></td>
+              <td>PostgreSQL 15</td>
+              <td>Structured audit logs &amp; incident records</td>
+            </tr>
+            <tr>
+              <td><strong>Redis</strong></td>
+              <td><code>localhost:7200</code></td>
+              <td>Redis</td>
+              <td>Session caching &amp; rate limiting</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h2>Data Flow: Threat Detection</h2>
+        <div class="card">
+          <pre>File System Events
+    ↓
+File Watcher (Rust) → [Entropy, Path, Process ID, Timestamps]
+    ↓
+Vigil ML Engine
+    ├─→ Mass Modification Check  (>15% files in 60s → CRITICAL)
+    ├─→ Entropy Analysis         (>0.85 score → CRITICAL)
+    ├─→ Lateral Movement         (2+ suspicious processes → HIGH)
+    └─→ VSS Abuse Detection      (vssadmin delete → CRITICAL)
+    ↓
+Detection Event → MinIO (Immutable) + PostgreSQL (Audit)
+    ↓
+Confidence > Threshold?
+    └─→ YES: Auto-trigger Shield
+         ├─→ Isolate → VLAN quarantine (&lt;2.5s)
+         ├─→ Lock    → Object Lock activation
+         └─→ Recover → Snapshot restoration
+    ↓
+LLM Analysis (Gemini 2.5 Flash) → Plain-English summary
+    ↓
+Dashboard WebSocket Update (Real-time)</pre>
+        </div>
+
+        <h2>Data Flow: Recovery</h2>
+        <div class="card">
+          <pre>Incident Detected &amp; Contained
+    ↓
+Evidence Preserved (Immutable MinIO)
+    ↓
+Recovery Task Created
+    ├─→ Type: restore_snapshot / rebuild / incremental
+    ├─→ Priority: 1-5 (queue management)
+    └─→ Parallel execution (8 threads default)
+    ↓
+Data Validation
+    ├─→ Integrity check (MD5/SHA256)
+    ├─→ Completeness verification
+    └─→ Malware re-infection scan
+    ↓
+Restoration Complete → Metrics Updated
+    ├─→ MTTC (Mean Time to Contain)
+    ├─→ Data loss calculation (&lt;0.1% target)
+    └─→ Defensibility Index update</pre>
+        </div>
+
+        <h2>Defense-in-Depth Layers</h2>
+        <div class="two-col">
+          <div class="card">
+            <h3 style="color:var(--vigil)">Detection Layer (WALL)</h3>
+            <ul>
+              <li>ML-based behavioral analysis</li>
+              <li>Shannon entropy monitoring</li>
+              <li>Process correlation chains</li>
+              <li>Network activity analysis</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3 style="color:var(--warn)">Isolation Layer (SQUAT)</h3>
+            <ul>
+              <li>VLAN micro-segmentation</li>
+              <li>Network quarantine (&lt;30s)</li>
+              <li>Process termination</li>
+              <li>File access revocation</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3 style="color:var(--shield)">Recovery Layer (GRAB)</h3>
+            <ul>
+              <li>Immutable snapshot restoration</li>
+              <li>Incremental block recovery</li>
+              <li>Credential management</li>
+              <li>System rebuild capability</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3 style="color:var(--muted)">Immutability Layer</h3>
+            <ul>
+              <li>Write-once object storage</li>
+              <li>Object Lock (compliance mode)</li>
+              <li>Legal hold capability</li>
+              <li>Tamper-proof audit logs</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========== COMPONENTS ========== -->
+      <section id="components" class="section">
+        <h1>Components</h1>
+        <p>Four core components implement the WALL-SQUAT-GRAB framework. Each maps to specific defense pillars and exposes a REST API consumed by the Dashboard and automation workflows.</p>
+
+        <!-- FORGE -->
+        <div class="card forge" style="margin-top:2rem">
+          <h2 style="color:var(--forge);margin-top:0">&#x1F525; The Forge — Testing &amp; Simulation</h2>
+          <p><strong>Directory</strong>: <code>forge/</code> &nbsp;|&nbsp; <strong>Service</strong>: <code>backend/services/forge_service.py</code></p>
+          <p>Safe, controlled simulation of ransomware behaviors for testing all three pillars (WALL, SQUAT, GRAB) without deploying real threats. The Forge is the "Red Team in a box."</p>
+
+          <h3>Sub-components</h3>
+          <div class="two-col">
+            <div>
+              <h4>Honeypot Architect</h4>
+              <ul>
+                <li>Generates realistic file structures (PDF, Excel, SQL dumps)</li>
+                <li>Configurable file size: 1–100 MB per file</li>
+                <li>Modified timestamps blend with real data</li>
+                <li>Acts as detection tripwires</li>
+              </ul>
+            </div>
+            <div>
+              <h4>Resilience Payloads</h4>
+              <ul>
+                <li>Entropy spike mimicking real encryption</li>
+                <li>File modification patterns matching real threats</li>
+                <li>Non-destructive (reads files, no actual encryption)</li>
+                <li>Configurable intensity (0.0–1.0)</li>
+              </ul>
+            </div>
+            <div>
+              <h4>Identity Squatting Tests</h4>
+              <ul>
+                <li>Kerberos lateral movement simulation</li>
+                <li>Unauthorized ticket request patterns</li>
+                <li>Credential reuse detection</li>
+                <li>Domain enumeration attempts</li>
+              </ul>
+            </div>
+            <div>
+              <h4>Payload Types</h4>
+              <ul>
+                <li><code>honeypot</code> — Trap file generation</li>
+                <li><code>mass_modification</code> — Bulk file changes</li>
+                <li><code>encryption_sim</code> — Entropy injection</li>
+                <li><code>lateral_movement</code> — Network scan simulation</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- VIGIL -->
+        <div class="card vigil">
+          <h2 style="color:var(--vigil);margin-top:0">&#x1F441; Vigil — Detection Engine (WALL/PREVENT)</h2>
+          <p><strong>Directory</strong>: <code>vigil/</code> &nbsp;|&nbsp; <strong>Key file</strong>: <code>vigil/detector.py</code></p>
+          <p>Detect threats <em>before</em> they cause damage through AI-driven behavioral analysis. Vigil implements the WALL pillar — the first line of defense that identifies ransomware indicators and feeds the Shield for automated response.</p>
+
+          <h3>Sub-components</h3>
+          <div class="two-col">
+            <div>
+              <h4>Behavioral ML Engine</h4>
+              <ul>
+                <li>Mass modification detection (&gt;15% files in 60s)</li>
+                <li>Entropy analysis (&gt;0.85 indicates encryption)</li>
+                <li>Lateral movement tracking via process chains</li>
+                <li>VSS (Volume Shadow Copy) abuse detection</li>
+              </ul>
+            </div>
+            <div>
+              <h4>Immutable Telemetry Pipeline</h4>
+              <ul>
+                <li>Write-once logging: Vector/Fluentd → Kafka → MinIO</li>
+                <li>Object Lock prevents deletion (365-day retention)</li>
+                <li>Tamper-proof: HIPAA, PCI-DSS, SOC2 compliant</li>
+                <li>All events timestamped and hash-verified</li>
+              </ul>
+            </div>
+            <div>
+              <h4>LLM Integration (Gemini 2.5 Flash)</h4>
+              <ul>
+                <li>Plain-English attack summarization</li>
+                <li>Recommended hardening actions</li>
+                <li>Defensibility gap identification</li>
+                <li>Contextual threat intelligence</li>
+              </ul>
+            </div>
+            <div>
+              <h4>Detection Signatures</h4>
+              <table style="margin:0">
+                <thead><tr><th>Pattern</th><th>Threshold</th><th>Severity</th></tr></thead>
+                <tbody>
+                  <tr><td>Entropy Score</td><td>&gt;0.85</td><td><span class="sev critical">CRITICAL</span></td></tr>
+                  <tr><td>Mass Modification</td><td>&gt;15% / 60s</td><td><span class="sev critical">CRITICAL</span></td></tr>
+                  <tr><td>Lateral Movement</td><td>2+ processes</td><td><span class="sev high">HIGH</span></td></tr>
+                  <tr><td>VSS Abuse</td><td>vssadmin delete</td><td><span class="sev critical">CRITICAL</span></td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- SHIELD -->
+        <div class="card shield">
+          <h2 style="color:var(--shield);margin-top:0">&#x1F6E1; The Shield — Response &amp; Recovery (SQUAT/GRAB)</h2>
+          <p><strong>Directory</strong>: <code>shield/</code> &nbsp;|&nbsp; <strong>Key file</strong>: <code>backend/services/shield_service.py</code></p>
+          <p>Rapidly contain threats (SQUAT) AND restore operations from verified backups (GRAB). The Shield implements both survival and control pillars.</p>
+
+          <div class="two-col">
+            <div>
+              <h4>SQUAT — Dynamic Micro-Segmentation</h4>
+              <ul>
+                <li>Automated VLAN isolation via API</li>
+                <li>Network quarantine in &lt;30 seconds</li>
+                <li>Blocks lateral movement immediately</li>
+                <li>Rollback capability for false positives (&lt;5s)</li>
+              </ul>
+              <p style="color:var(--muted);font-size:.85rem"><strong>MTTC target:</strong> &lt;60 seconds &nbsp;|&nbsp; <strong>Isolation:</strong> 100%</p>
+            </div>
+            <div>
+              <h4>GRAB — Immutable Object Locking</h4>
+              <ul>
+                <li>MinIO Compliance Mode activation</li>
+                <li>Legal hold on forensic buckets</li>
+                <li>Prevents even admin deletion</li>
+                <li>Tamper-proof backup verification</li>
+              </ul>
+            </div>
+            <div>
+              <h4>GRAB — Recovery Orchestration</h4>
+              <ul>
+                <li>Snapshot restoration from verified backups</li>
+                <li>Credential revocation automation</li>
+                <li>Block-level incremental restores</li>
+                <li>Parallel recovery threads (default: 8)</li>
+              </ul>
+              <p style="color:var(--muted);font-size:.85rem"><strong>MTTR target:</strong> &lt;15 minutes &nbsp;|&nbsp; <strong>Data loss:</strong> &lt;0.1%</p>
+            </div>
+            <div>
+              <h4>GRAB — Forensic Curation</h4>
+              <ul>
+                <li>Automatic evidence preservation</li>
+                <li>Chain of custody maintained</li>
+                <li>Attack artifacts captured</li>
+                <li>90-day default retention</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <!-- DASHBOARD -->
+        <div class="card dashboard">
+          <h2 style="color:var(--dashboard);margin-top:0">&#x1F4CA; The Dashboard — Control Center</h2>
+          <p><strong>Directory</strong>: <code>dashboard/</code> &nbsp;|&nbsp; <strong>URL</strong>: <a href="http://localhost:7700">http://localhost:7700</a></p>
+          <p>Real-time monitoring, analysis, and configuration. The Dashboard aggregates data from all three pillars to compute the Defensibility Index and provide a single pane of glass.</p>
+
+          <div class="two-col">
+            <div>
+              <h4>Defensibility Index (0–100)</h4>
+              <ul>
+                <li>Detection effectiveness — <strong>30%</strong> weight</li>
+                <li>Isolation success — <strong>30%</strong> weight</li>
+                <li>Recovery completeness — <strong>20%</strong> weight</li>
+                <li>Immutability confidence — <strong>20%</strong> weight</li>
+              </ul>
+            </div>
+            <div>
+              <h4>MTTC Tracker</h4>
+              <ul>
+                <li>Detection → Isolation → Recovery timeline</li>
+                <li>Per-incident breakdown</li>
+                <li>24-hour trend analysis</li>
+                <li>Benchmark comparisons</li>
+              </ul>
+            </div>
+            <div>
+              <h4>Configuration Studio</h4>
+              <ul>
+                <li>Mass modification threshold (default: 15%)</li>
+                <li>Entropy threshold (default: 0.85)</li>
+                <li>Auto-isolation toggle</li>
+                <li>Recovery strategy selection</li>
+              </ul>
+            </div>
+            <div>
+              <h4>Incident Timeline</h4>
+              <ul>
+                <li>Attack progression visualization</li>
+                <li>Response actions timestamped</li>
+                <li>Severity: Low / Medium / High / Critical</li>
+                <li>Data integrity percentage display</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========== API REFERENCE ========== -->
+      <section id="api" class="section">
+        <h1>API Reference</h1>
+        <p>All endpoints are served from the Backend API at <a href="http://localhost:8000">http://localhost:8000</a>. Interactive docs available at <a href="http://localhost:8000/docs">http://localhost:8000/docs</a>.</p>
+
+        <!-- FORGE -->
+        <h2 style="color:var(--forge)">&#x1F525; Forge API</h2>
+        <p>Simulation and attack payload management.</p>
+
+        <div class="endpoint">
+          <span class="badge post">POST</span>
+          <span class="path">/api/v1/forge/deploy</span>
+          <span class="desc">Deploy a simulated attack payload. Returns <code>payload_id</code> for tracking.</span>
+        </div>
+        <pre>{
+  "name": "conference_demo_attack",
+  "payload_type": "mass_modification",
+  "target_path": "/tmp/honeypot",
+  "duration_seconds": 60,
+  "intensity": 1.0
+}</pre>
+
+        <div class="endpoint">
+          <span class="badge get">GET</span>
+          <span class="path">/api/v1/forge/payloads/{payload_id}</span>
+          <span class="desc">Get status and lifecycle details of a deployed payload.</span>
+        </div>
+
+        <div class="endpoint">
+          <span class="badge post">POST</span>
+          <span class="path">/api/v1/forge/honeypot/generate</span>
+          <span class="desc">Generate realistic honeypot files to act as detection tripwires.</span>
+        </div>
+        <pre>{
+  "file_types": ["pdf", "docx", "xlsx"],
+  "count": 50,
+  "size_mb": 1.0
+}</pre>
+
+        <div class="endpoint">
+          <span class="badge post">POST</span>
+          <span class="path">/api/v1/forge/identity-squat/kerberos-test</span>
+          <span class="desc">Simulate Kerberos lateral movement — unauthorized ticket requests and credential reuse patterns.</span>
+        </div>
+
+        <!-- VIGIL -->
+        <h2 style="color:var(--vigil)">&#x1F441; Vigil API</h2>
+        <p>Detection events, behavioral analysis, and LLM insights (WALL/PREVENT pillar).</p>
+
+        <div class="endpoint">
+          <span class="badge get">GET</span>
+          <span class="path">/api/v1/vigil/events</span>
+          <span class="desc">Retrieve detection events. Query params: <code>limit</code>, <code>threat_level</code> (critical/high/medium/low).</span>
+        </div>
+
+        <div class="endpoint">
+          <span class="badge post">POST</span>
+          <span class="path">/api/v1/vigil/events</span>
+          <span class="desc">Record a new detection event (typically called by the Watcher service).</span>
+        </div>
+        <pre>{
+  "event_id": "evt-001",
+  "timestamp": "2024-02-19T10:00:00Z",
+  "threat_type": "mass_modification",
+  "threat_level": "critical",
+  "affected_path": "/home/user/docs",
+  "file_count": 5000,
+  "entropy_score": 0.87,
+  "confidence": 0.94,
+  "details": {}
+}</pre>
+
+        <div class="endpoint">
+          <span class="badge post">POST</span>
+          <span class="path">/api/v1/vigil/behaviors/analyze</span>
+          <span class="desc">Trigger behavioral analysis on a path. Params: <code>path</code>, <code>process_id</code>, <code>duration_seconds</code>.</span>
+        </div>
+
+        <div class="endpoint">
+          <span class="badge get">GET</span>
+          <span class="path">/api/v1/vigil/telemetry</span>
+          <span class="desc">Access immutable telemetry log entries from MinIO Object Lock storage.</span>
+        </div>
+
+        <div class="endpoint">
+          <span class="badge post">POST</span>
+          <span class="path">/api/v1/vigil/insights/generate</span>
+          <span class="desc">Generate LLM-powered (Gemini 2.5 Flash) plain-English attack summary for a given event.</span>
+        </div>
+
+        <!-- SHIELD -->
+        <h2 style="color:var(--shield)">&#x1F6E1; Shield API</h2>
+        <p>Isolation, object locking, recovery, and forensic preservation (SQUAT/GRAB pillars).</p>
+
+        <div class="endpoint">
+          <span class="badge post">POST</span>
+          <span class="path">/api/v1/shield/isolate</span>
+          <span class="desc">Trigger VLAN isolation of a compromised resource. SQUAT pillar — limits blast radius.</span>
+        </div>
+        <pre>{
+  "resource_id": "workstation_001",
+  "action": "vlan_isolate",
+  "reason": "mass_modification_detected",
+  "preserve_logs": true
+}</pre>
+
+        <div class="endpoint">
+          <span class="badge post">POST</span>
+          <span class="path">/api/v1/shield/object-lock/activate</span>
+          <span class="desc">Enable MinIO Compliance Mode Object Lock on a storage bucket. GRAB pillar — prevents backup tampering.</span>
+        </div>
+        <pre>{
+  "bucket_name": "backup-bucket",
+  "retention_days": 365,
+  "legal_hold": true
+}</pre>
+
+        <div class="endpoint">
+          <span class="badge post">POST</span>
+          <span class="path">/api/v1/shield/recovery/create</span>
+          <span class="desc">Start a recovery workflow. Params: <code>recovery_type</code> (restore_snapshot/rebuild/incremental), <code>priority</code> (1-5).</span>
+        </div>
+
+        <div class="endpoint">
+          <span class="badge post">POST</span>
+          <span class="path">/api/v1/shield/forensics/preserve</span>
+          <span class="desc">Archive attack evidence to immutable storage with chain of custody. GRAB pillar.</span>
+        </div>
+
+        <div class="endpoint">
+          <span class="badge get">GET</span>
+          <span class="path">/api/v1/shield/status</span>
+          <span class="desc">Get current Shield status — active isolations, recovery tasks, object lock state.</span>
+        </div>
+
+        <!-- DASHBOARD -->
+        <h2 style="color:var(--dashboard)">&#x1F4CA; Dashboard API</h2>
+        <p>Metrics, Defensibility Index, and configuration management.</p>
+
+        <div class="endpoint">
+          <span class="badge get">GET</span>
+          <span class="path">/api/v1/dashboard/summary</span>
+          <span class="desc">Complete system overview — active incidents, MTTC, Defensibility Index, component health.</span>
+        </div>
+
+        <div class="endpoint">
+          <span class="badge get">GET</span>
+          <span class="path">/api/v1/dashboard/metrics/mttc</span>
+          <span class="desc">Detailed Mean Time to Contain metrics with historical trends.</span>
+        </div>
+
+        <div class="endpoint">
+          <span class="badge get">GET</span>
+          <span class="path">/api/v1/dashboard/defensibility-index</span>
+          <span class="desc">Defensibility Index breakdown — detection, isolation, recovery, and immutability component scores.</span>
+        </div>
+
+        <div class="endpoint">
+          <span class="badge put">PUT</span>
+          <span class="path">/api/v1/dashboard/config/thresholds</span>
+          <span class="desc">Update detection sensitivity thresholds in real-time.</span>
+        </div>
+        <pre>{
+  "mass_modification_threshold": 0.10,
+  "entropy_threshold": 0.85,
+  "sensitivity_level": "strict"
+}</pre>
+
+        <div class="endpoint">
+          <span class="badge get">GET</span>
+          <span class="path">/api/v1/dashboard/incidents</span>
+          <span class="desc">List all incidents with severity, timeline, and response status.</span>
+        </div>
+
+        <!-- Health -->
+        <h2>System Health</h2>
+
+        <div class="endpoint">
+          <span class="badge get">GET</span>
+          <span class="path">/</span>
+          <span class="desc">Root health check — returns service version and status.</span>
+        </div>
+
+        <div class="endpoint">
+          <span class="badge get">GET</span>
+          <span class="path">/health</span>
+          <span class="desc">Detailed health check — all services, database connection, Kafka, MinIO status.</span>
+        </div>
+      </section>
+
+      <!-- ========== DETECTION ========== -->
+      <section id="detection" class="section">
+        <h1>Detection Engine</h1>
+        <p>Vigil's detection engine combines ML-based behavioral analysis with rule-based pattern matching and LLM-powered summarization to identify ransomware with high confidence and low false positive rates.</p>
+
+        <h2>Detection Patterns</h2>
+        <div class="detect-grid">
+          <div class="detect-card">
+            <div class="detect-icon">&#x1F4C8;</div>
+            <h4>Mass File Modification</h4>
+            <div class="threshold">Threshold: &gt;15% files modified in 60s</div>
+            <span class="sev critical">CRITICAL</span>
+            <p style="font-size:.82rem;color:var(--muted);margin-top:.5rem">Monitors file modification rates across watched directories. Ransomware typically encrypts large batches of files in rapid succession, producing a distinctive modification spike.</p>
+          </div>
+          <div class="detect-card">
+            <div class="detect-icon">&#x1F4A1;</div>
+            <h4>Entropy Analysis</h4>
+            <div class="threshold">Threshold: Shannon entropy &gt;0.85</div>
+            <span class="sev critical">CRITICAL</span>
+            <p style="font-size:.82rem;color:var(--muted);margin-top:.5rem">Calculates Shannon entropy (<code>-∑ p·log₂(p)</code>) on file content. Encrypted files approach maximum entropy (1.0). Benign files typically score 0.3–0.7.</p>
+          </div>
+          <div class="detect-card">
+            <div class="detect-icon">&#x1F517;</div>
+            <h4>Lateral Movement</h4>
+            <div class="threshold">Threshold: 2+ suspicious process chains</div>
+            <span class="sev high">HIGH</span>
+            <p style="font-size:.82rem;color:var(--muted);margin-top:.5rem">Tracks process spawning chains (e.g., <code>powershell → cmd → net.exe</code>). Identifies credential reuse patterns and unauthorized Kerberos ticket requests across service accounts.</p>
+          </div>
+          <div class="detect-card">
+            <div class="detect-icon">&#x1F5C2;</div>
+            <h4>VSS Abuse</h4>
+            <div class="threshold">Trigger: vssadmin delete / wbadmin delete</div>
+            <span class="sev critical">CRITICAL</span>
+            <p style="font-size:.82rem;color:var(--muted);margin-top:.5rem">Detects Volume Shadow Copy (VSS) deletion attempts — a common ransomware technique to prevent recovery. Any VSS deletion command triggers immediate isolation.</p>
+          </div>
+        </div>
+
+        <h2>Sigma Rules</h2>
+        <p>Vigil ships with vendor-agnostic Sigma detection rules that can be deployed to any SIEM. Located in <code>drra-policies/sigma/</code>.</p>
+
+        <table>
+          <thead><tr><th>Rule File</th><th>Detects</th><th>Severity</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><code>ransomware_mass_modification.yml</code></td>
+              <td>&gt;15% files modified in 60 seconds in any watched directory</td>
+              <td><span class="sev critical">CRITICAL</span></td>
+            </tr>
+            <tr>
+              <td><code>entropy_spike_detection.yml</code></td>
+              <td>Shannon entropy &gt;0.85 on file write events (encryption indicator)</td>
+              <td><span class="sev critical">CRITICAL</span></td>
+            </tr>
+            <tr>
+              <td><code>vss_abuse.yml</code></td>
+              <td><code>vssadmin.exe</code> or <code>wbadmin.exe</code> delete operations</td>
+              <td><span class="sev critical">CRITICAL</span></td>
+            </tr>
+            <tr>
+              <td><code>lateral_movement_kerberos.yml</code></td>
+              <td>Kerberos ticket requests to 3+ services from a single process</td>
+              <td><span class="sev high">HIGH</span></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h2>OPA Governance Policies</h2>
+        <p>Open Policy Agent rules govern isolation decisions and recovery validation. Located in <code>drra-policies/opa/</code>.</p>
+        <table>
+          <thead><tr><th>Policy File</th><th>Purpose</th></tr></thead>
+          <tbody>
+            <tr><td><code>isolation_vlan_rules.rego</code></td><td>Safe network quarantine — prevent over-isolation of critical systems</td></tr>
+            <tr><td><code>blast_radius_containment.rego</code></td><td>Limit lateral movement spread — maximum quarantine scope rules</td></tr>
+            <tr><td><code>recovery_validation.rego</code></td><td>Snapshot integrity checks before restoring to production</td></tr>
+            <tr><td><code>immutability_enforcement.rego</code></td><td>Object Lock and legal hold policy enforcement</td></tr>
+          </tbody>
+        </table>
+
+        <h2>Semgrep Code Rules</h2>
+        <p>Static analysis rules enforce secure coding patterns across the codebase. Located in <code>drra-policies/semgrep/</code>.</p>
+        <table>
+          <thead><tr><th>Category</th><th>What It Enforces</th></tr></thead>
+          <tbody>
+            <tr><td>Logging Enforcement</td><td>All file operations, isolations, and recoveries must log to MinIO before execution</td></tr>
+            <tr><td>Cryptography Security</td><td>No DES/MD5/SHA1; no <code>random.randint()</code> in security contexts; no hardcoded keys</td></tr>
+            <tr><td>Input Validation</td><td>SQL injection, path traversal, command injection, ReDoS prevention</td></tr>
+            <tr><td>Resilience Patterns</td><td>Exception handling in recovery; timeouts on isolation; bounded recovery threads</td></tr>
+          </tbody>
+        </table>
+
+        <h2>Immutability Timeline</h2>
+        <div class="card">
+          <pre>Ransomware Attack Timeline:
+│
+├─ T+0s:    Malware execution detected by Watcher
+├─ T+2.1s:  Isolation activated (VLAN quarantine)
+├─ T+42.3s: Containment achieved (MTTC = 42.3s ✓)
+│
+├─ Attacker attempts: Delete logs?      ✗ (Object Lock enforced)
+├─ Attacker attempts: Corrupt backups?  ✗ (MinIO Compliance Mode)
+├─ Attacker attempts: Tamper audit?     ✗ (Write-once guaranteed)
+│
+└─ T+45m:   Full recovery completed, 0% data loss</pre>
+        </div>
+
+        <h2>Configuration Profiles</h2>
+        <div class="two-col">
+          <div class="card">
+            <h3>High-Security Profile</h3>
+            <pre>detection:
+  mass_modification_threshold: 0.05
+  entropy_threshold: 0.80
+
+isolation:
+  auto_isolate: true
+  isolation_timeout: 1s
+
+recovery:
+  auto_start: false
+  parallel_threads: 16
+
+logs:
+  retention_days: 365
+  legal_hold: true</pre>
+          </div>
+          <div class="card">
+            <h3>Balanced Profile (Default)</h3>
+            <pre>detection:
+  mass_modification_threshold: 0.15
+  entropy_threshold: 0.85
+
+isolation:
+  auto_isolate: true
+  isolation_timeout: 2.5s
+
+recovery:
+  auto_start: false
+  parallel_threads: 8
+
+logs:
+  retention_days: 90
+  legal_hold: false</pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========== QUICK START ========== -->
+      <section id="quickstart" class="section">
+        <h1>Quick Start</h1>
+        <p>Get Resilience Forge running in under 5 minutes using Docker Compose.</p>
+
+        <h2>Prerequisites</h2>
+        <ul>
+          <li>Docker Desktop (latest)</li>
+          <li>Python 3.11+</li>
+          <li>Node.js 18+ (for dashboard development)</li>
+          <li>Rust 1.70+ (for watcher development)</li>
+          <li>4 GB RAM minimum, 8 GB recommended</li>
+        </ul>
+
+        <h2>Service URLs</h2>
+        <table>
+          <thead><tr><th>Service</th><th>URL</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td><strong>Backend API</strong></td><td><a class="service-link" href="http://localhost:8000">http://localhost:8000</a></td><td>FastAPI core — all component routes</td></tr>
+            <tr><td><strong>Swagger UI</strong></td><td><a class="service-link" href="http://localhost:8000/docs">http://localhost:8000/docs</a></td><td>Interactive API documentation</td></tr>
+            <tr><td><strong>Dashboard</strong></td><td><a class="service-link" href="http://localhost:7700">http://localhost:7700</a></td><td>React frontend — Defensibility Index &amp; MTTC</td></tr>
+            <tr><td><strong>Grafana</strong></td><td><a class="service-link" href="http://localhost:7600">http://localhost:7600</a></td><td>Live metrics &amp; alerting (admin/admin)</td></tr>
+            <tr><td><strong>Prometheus</strong></td><td><a class="service-link" href="http://localhost:7500">http://localhost:7500</a></td><td>Metrics collection &amp; time-series storage</td></tr>
+            <tr><td><strong>MinIO Console</strong></td><td><a class="service-link" href="http://localhost:7001">http://localhost:7001</a></td><td>Immutable object storage (minioadmin/minioadmin)</td></tr>
+            <tr><td><strong>Kafka</strong></td><td><code>localhost:7300</code></td><td>Event streaming for telemetry pipeline</td></tr>
+            <tr><td><strong>PostgreSQL</strong></td><td><code>localhost:7100</code></td><td>Audit logs (drra_admin/drra_secure_password)</td></tr>
+            <tr><td><strong>Redis</strong></td><td><code>localhost:7200</code></td><td>Session caching &amp; rate limiting</td></tr>
+          </tbody>
+        </table>
+
+        <h2>Step-by-Step Setup</h2>
+        <div class="steps">
+          <div class="step">
+            <h4>Clone the Repository</h4>
+            <pre>git clone https://github.com/resilience-forge/drra.git
+cd resilience-forge
+cp .env.example .env</pre>
+          </div>
+          <div class="step">
+            <h4>Start All Services</h4>
+            <pre>docker-compose up -d</pre>
+            <p style="font-size:.85rem;color:var(--muted)">Wait 30–60 seconds for all containers to become healthy. Verify with: <code>docker-compose ps</code></p>
+          </div>
+          <div class="step">
+            <h4>Install Python Dependencies</h4>
+            <pre>pip install -r requirements.txt
+pip install pytest pytest-asyncio pytest-cov flake8</pre>
+          </div>
+          <div class="step">
+            <h4>Start the Backend API</h4>
+            <pre>cd backend
+uvicorn main:app --reload --host 0.0.0.0 --port 8000</pre>
+            <p style="font-size:.85rem;color:var(--muted)">API available at <a href="http://localhost:8000">http://localhost:8000</a> — Swagger UI at <a href="http://localhost:8000/docs">http://localhost:8000/docs</a></p>
+          </div>
+          <div class="step">
+            <h4>Verify System Health</h4>
+            <pre>curl http://localhost:8000/health | python -m json.tool</pre>
+          </div>
+          <div class="step">
+            <h4>Run Your First Simulation</h4>
+            <pre># 1. Deploy a honeypot
+curl -X POST http://localhost:8000/api/v1/forge/deploy \
+  -H "Content-Type: application/json" \
+  -d '{"name":"demo_attack","payload_type":"mass_modification","target_path":"/tmp/honeypot","duration_seconds":60,"intensity":1.0}'
+
+# 2. Watch Vigil detect it
+curl "http://localhost:8000/api/v1/vigil/events?threat_level=critical" | python -m json.tool
+
+# 3. Check the Dashboard
+open http://localhost:7700</pre>
+          </div>
+          <div class="step">
+            <h4>Run the Test Suite (The Gauntlet)</h4>
+            <pre># Run all tests
+pytest tests/ -v
+
+# Run full end-to-end scenario
+pytest tests/test_gauntlet.py::TestGauntletScenarios::test_complete_ransomware_scenario -v
+
+# Run with coverage
+pytest tests/ --cov=backend --cov-report=html</pre>
+            <p style="font-size:.85rem;color:var(--muted)"><strong>Build pass requirements:</strong> data loss &lt;0.1%, MTTC &lt;60s, all logs immutable, detection confidence &gt;90%</p>
+          </div>
+        </div>
+
+        <h2>Troubleshooting</h2>
+        <table>
+          <thead><tr><th>Issue</th><th>Solution</th></tr></thead>
+          <tbody>
+            <tr><td>Services not starting</td><td><code>docker-compose logs &lt;service&gt;</code> then <code>docker-compose restart</code></td></tr>
+            <tr><td>API connection refused</td><td>Verify: <code>curl http://localhost:8000/health</code> — check port 8000 availability</td></tr>
+            <tr><td>Dashboard blank</td><td>Check browser console (F12); verify backend health; clear cache</td></tr>
+            <tr><td><code>ModuleNotFoundError</code></td><td>Set <code>$env:PYTHONPATH = "."</code> (Windows) or <code>export PYTHONPATH=.</code> before pytest</td></tr>
+            <tr><td>Insufficient disk space</td><td><code>docker-compose down -v &amp;&amp; docker system prune -a</code></td></tr>
+            <tr><td>Port already in use</td><td>Check: <code>netstat -ano | findstr 8000</code> (Windows) or <code>lsof -i :8000</code></td></tr>
+          </tbody>
+        </table>
+
+        <h2>Project Structure</h2>
+        <pre>ransomwaredefense/
+├── backend/              # FastAPI core — routes, services, models
+│   ├── main.py           # App entry point
+│   ├── routes/           # API endpoint handlers
+│   └── services/         # Business logic (forge, vigil, shield)
+├── vigil/                # WALL — ML detection & telemetry (Python)
+├── forge/                # Simulation & payload testing (stub)
+├── shield/               # SQUAT/GRAB — response & recovery (stub)
+├── dashboard/            # React/TypeScript frontend
+├── watchers/             # Rust file monitoring (tokio + rayon)
+├── infra/                # Ansible, Kubernetes, Docker configs
+├── tests/                # CI/CD test suite (The Gauntlet)
+├── drra-policies/        # Sigma, OPA, Semgrep rules
+│   ├── sigma/            # Detection rules (SIEM-deployable)
+│   ├── opa/              # Governance policies
+│   ├── semgrep/          # Secure coding rules
+│   ├── playbooks/        # Incident response orchestration
+│   └── hardening/        # Post-recovery hardening
+├── docs/                 # Architecture & design docs
+└── docker-compose.yml    # Container orchestration</pre>
+      </section>
+
+    </div><!-- /content -->
+
+    <footer>
+      <strong>Resilience Forge (DRRA)</strong> — Building infrastructure that survives the unthinkable. &nbsp;|&nbsp;
+      WALL-SQUAT-GRAB Framework &nbsp;|&nbsp;
+      <a href="http://localhost:8000/docs">API Docs</a> &nbsp;|&nbsp;
+      <a href="ARCHITECTURE.md">Architecture Guide</a>
+    </footer>
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<script>
+  const sections = document.querySelectorAll('.section');
+  const navLinks = document.querySelectorAll('.nav-link');
+  const pageTitleEl = document.getElementById('page-title');
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('overlay');
+
+  const titles = {
+    overview: 'Overview',
+    architecture: 'Architecture',
+    components: 'Components',
+    api: 'API Reference',
+    detection: 'Detection Engine',
+    quickstart: 'Quick Start',
+  };
+
+  function navigate(id, linkEl) {
+    // Hide all sections
+    sections.forEach(s => s.classList.remove('active'));
+    navLinks.forEach(l => l.classList.remove('active'));
+
+    // Show target section
+    const target = document.getElementById(id);
+    if (target) target.classList.add('active');
+
+    // Highlight nav link
+    if (linkEl) linkEl.classList.add('active');
+
+    // Update page title
+    pageTitleEl.textContent = titles[id] || id;
+
+    // Close mobile sidebar
+    closeSidebar();
+
+    // Scroll to top of content
+    window.scrollTo(0, 0);
+
+    // Update URL hash without scroll
+    history.replaceState(null, '', '#' + id);
+
+    return false;
+  }
+
+  function toggleSidebar() {
+    sidebar.classList.toggle('open');
+    overlay.classList.toggle('open');
+  }
+
+  function closeSidebar() {
+    sidebar.classList.remove('open');
+    overlay.classList.remove('open');
+  }
+
+  // Handle initial hash
+  (function() {
+    const hash = window.location.hash.replace('#', '');
+    if (hash && document.getElementById(hash)) {
+      const link = document.querySelector(`.nav-link[href="#${hash}"]`);
+      navigate(hash, link);
+    }
+  })();
+</script>
+</body>
+</html>

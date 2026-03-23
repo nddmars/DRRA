@@ -194,7 +194,7 @@ File System Events
     ↓
 File Watcher (Rust) → [Entropy, Path, Process ID]
     ↓
-Sentinel ML Engine
+Vigil ML Engine
     ├─→ Mass Modification Check
     ├─→ Entropy Analysis
     ├─→ Lateral Movement Detection
@@ -249,7 +249,7 @@ Metrics Update
 - **MinIO**: S3-compatible storage
 - **Redis**: Caching & sessions
 
-### Sentinel (`sentinel/`)
+### Vigil (`vigil/`)
 - **scikit-learn**: ML classification
 - **NumPy/Pandas**: Data processing
 - **TensorFlow**: Deep learning (optional)
