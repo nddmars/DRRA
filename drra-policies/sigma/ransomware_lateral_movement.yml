@@ -1,0 +1,66 @@
+title: Ransomware - Lateral Movement via Credential Reuse
+id: 34g67890-cdef-3456-gh78-901234567890
+description: Detects lateral movement patterns consistent with ransomware propagation — credential reuse over SMB/RDP/WMI, PsExec-style execution, and abnormal authentication spikes.
+status: experimental
+author: Resilience Forge Team
+date: 2026/03/23
+
+logsource:
+  category: network_connection
+  product: windows
+  service: security
+
+detection:
+  smb_lateral:
+    EventID: 4624
+    LogonType: 3
+    AuthenticationPackageName: 'NTLM'
+    WorkstationName|contains: 'WORKSTATION'
+
+  psexec_pattern:
+    Image|endswith:
+      - '\PSEXESVC.exe'
+      - '\paexec.exe'
+      - '\remcom.exe'
+    CommandLine|contains:
+      - '\\admin$'
+      - '\\ipc$'
+
+  wmi_execution:
+    EventID: 4688
+    ParentImage|endswith: '\wmiprvse.exe'
+    Image|endswith:
+      - '\cmd.exe'
+      - '\powershell.exe'
+      - '\wscript.exe'
+
+  auth_spike:
+    EventID: 4625
+    TimeframeWindow: 60s
+    FailureCountThreshold: 10
+
+  condition: (smb_lateral and auth_spike) or psexec_pattern or wmi_execution
+
+falsepositives:
+  - IT administrators using remote management tools
+  - Legitimate software deployment (SCCM, Ansible)
+  - Domain controller authentication events
+
+level: high
+tags:
+  - ransomware
+  - lateral_movement
+  - credential_reuse
+  - smb
+  - t1021  # MITRE ATT&CK: Remote Services
+  - t1078  # MITRE ATT&CK: Valid Accounts
+
+references:
+  - https://attack.mitre.org/techniques/T1021/
+  - https://attack.mitre.org/techniques/T1078/
+  - https://docs.resilience-forge.com/vigil/detections/lateral-movement
+
+enrichment:
+  correlate_with_mass_modification: true
+  check_admin_schedule: true
+  alert_shield_for_vlan_isolation: true

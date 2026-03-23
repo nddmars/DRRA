@@ -1,0 +1,53 @@
+title: Ransomware - VSS Shadow Copy Deletion
+id: 23f56789-bcde-2345-fg67-890123456789
+description: Detects deletion of Volume Shadow Copies (VSS) — a common ransomware technique to prevent recovery. Triggers on vssadmin, wmic, or PowerShell shadow copy deletion commands.
+status: stable
+author: Resilience Forge Team
+date: 2026/03/23
+
+logsource:
+  category: process_creation
+  product: windows
+
+detection:
+  vssadmin_delete:
+    CommandLine|contains|all:
+      - 'vssadmin'
+      - 'delete'
+      - 'shadows'
+
+  wmic_shadowcopy:
+    CommandLine|contains|all:
+      - 'wmic'
+      - 'shadowcopy'
+      - 'delete'
+
+  powershell_vss:
+    CommandLine|contains:
+      - 'Get-WmiObject Win32_Shadowcopy'
+      - 'IWbemServices'
+      - 'Win32_ShadowCopy'
+
+  condition: vssadmin_delete or wmic_shadowcopy or powershell_vss
+
+falsepositives:
+  - Legitimate backup software performing cleanup
+  - System administrators performing maintenance
+  - Disk cleanup utilities
+
+level: critical
+tags:
+  - ransomware
+  - vss
+  - shadow_copy
+  - recovery_prevention
+  - t1490  # MITRE ATT&CK: Inhibit System Recovery
+
+references:
+  - https://attack.mitre.org/techniques/T1490/
+  - https://docs.resilience-forge.com/vigil/detections/vss-deletion
+
+enrichment:
+  correlate_with_mass_modification: true
+  check_backup_software_running: true
+  alert_shield_for_isolation: true

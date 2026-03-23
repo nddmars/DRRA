@@ -478,6 +478,11 @@
         <span class="nav-icon">&#x1F50D;</span> Detection Engine
       </a>
 
+      <div class="nav-section">DevSecOps</div>
+      <a href="#devsecops" class="nav-link" onclick="navigate('devsecops',this)">
+        <span class="nav-icon">&#x1F6E1;</span> DevSecOps Pipeline
+      </a>
+
       <div class="nav-section">Getting Started</div>
       <a href="#quickstart" class="nav-link" onclick="navigate('quickstart',this)">
         <span class="nav-icon">&#x1F680;</span> Quick Start
@@ -1183,46 +1188,57 @@ Restoration Complete → Metrics Updated
             <p style="font-size:.82rem;color:var(--muted);margin-top:.5rem">Calculates Shannon entropy (<code>-∑ p·log₂(p)</code>) on file content. Encrypted files approach maximum entropy (1.0). Benign files typically score 0.3–0.7.</p>
           </div>
           <div class="detect-card">
-            <div class="detect-icon">&#x1F517;</div>
-            <h4>Lateral Movement</h4>
-            <div class="threshold">Threshold: 2+ suspicious process chains</div>
-            <span class="sev high">HIGH</span>
-            <p style="font-size:.82rem;color:var(--muted);margin-top:.5rem">Tracks process spawning chains (e.g., <code>powershell → cmd → net.exe</code>). Identifies credential reuse patterns and unauthorized Kerberos ticket requests across service accounts.</p>
+            <div class="detect-icon">&#x1F5C2;</div>
+            <h4>VSS Shadow Copy Deletion</h4>
+            <div class="threshold">Trigger: vssadmin / wmic / PowerShell VSS delete</div>
+            <span class="sev critical">CRITICAL</span>
+            <p style="font-size:.82rem;color:var(--muted);margin-top:.5rem">Detects Volume Shadow Copy deletion attempts via vssadmin, wmic shadowcopy delete, or PowerShell Win32_ShadowCopy calls — prevents attacker recovery sabotage.</p>
           </div>
           <div class="detect-card">
-            <div class="detect-icon">&#x1F5C2;</div>
-            <h4>VSS Abuse</h4>
-            <div class="threshold">Trigger: vssadmin delete / wbadmin delete</div>
+            <div class="detect-icon">&#x1F517;</div>
+            <h4>Lateral Movement</h4>
+            <div class="threshold">Trigger: NTLM reuse + auth spike / PsExec / WMI spawn</div>
+            <span class="sev high">HIGH</span>
+            <p style="font-size:.82rem;color:var(--muted);margin-top:.5rem">Detects credential reuse over SMB (NTLM logon type 3), PsExec-style remote execution, WMI process spawning, and authentication failure spikes (&gt;10 in 60s).</p>
+          </div>
+          <div class="detect-card">
+            <div class="detect-icon">&#x1F511;</div>
+            <h4>Privilege Escalation</h4>
+            <div class="threshold">Trigger: SeDebugPrivilege / UAC bypass / kernel driver</div>
             <span class="sev critical">CRITICAL</span>
-            <p style="font-size:.82rem;color:var(--muted);margin-top:.5rem">Detects Volume Shadow Copy (VSS) deletion attempts — a common ransomware technique to prevent recovery. Any VSS deletion command triggers immediate isolation.</p>
+            <p style="font-size:.82rem;color:var(--muted);margin-top:.5rem">Detects token impersonation (SeDebugPrivilege, SeImpersonatePrivilege), UAC bypass via fodhelper/eventvwr, suspicious kernel driver installation, and Office app spawning shells.</p>
           </div>
         </div>
 
         <h2>Sigma Rules</h2>
-        <p>Vigil ships with vendor-agnostic Sigma detection rules that can be deployed to any SIEM. Located in <code>drra-policies/sigma/</code>.</p>
+        <p>Vigil ships with 4 vendor-agnostic Sigma detection rules that can be deployed to any SIEM. Located in <code>drra-policies/sigma/</code>. See the <a href="#devsecops" onclick="navigate('devsecops',document.querySelector('.nav-link[href=\'#devsecops\']'));return false;">DevSecOps Pipeline</a> section for CI/CD integration details.</p>
 
         <table>
-          <thead><tr><th>Rule File</th><th>Detects</th><th>Severity</th></tr></thead>
+          <thead><tr><th>Rule File</th><th>Detects</th><th>MITRE ATT&amp;CK</th><th>Severity</th></tr></thead>
           <tbody>
             <tr>
               <td><code>ransomware_mass_modification.yml</code></td>
               <td>&gt;15% files modified in 60 seconds in any watched directory</td>
+              <td>T1486</td>
               <td><span class="sev critical">CRITICAL</span></td>
             </tr>
             <tr>
-              <td><code>entropy_spike_detection.yml</code></td>
-              <td>Shannon entropy &gt;0.85 on file write events (encryption indicator)</td>
+              <td><code>ransomware_vss_deletion.yml</code></td>
+              <td>VSS shadow copy deletion via vssadmin, wmic, or PowerShell</td>
+              <td>T1490</td>
               <td><span class="sev critical">CRITICAL</span></td>
             </tr>
             <tr>
-              <td><code>vss_abuse.yml</code></td>
-              <td><code>vssadmin.exe</code> or <code>wbadmin.exe</code> delete operations</td>
-              <td><span class="sev critical">CRITICAL</span></td>
-            </tr>
-            <tr>
-              <td><code>lateral_movement_kerberos.yml</code></td>
-              <td>Kerberos ticket requests to 3+ services from a single process</td>
+              <td><code>ransomware_lateral_movement.yml</code></td>
+              <td>Credential reuse over SMB/RDP/WMI, PsExec patterns, auth spikes</td>
+              <td>T1021 / T1078</td>
               <td><span class="sev high">HIGH</span></td>
+            </tr>
+            <tr>
+              <td><code>ransomware_privilege_escalation.yml</code></td>
+              <td>Token impersonation, UAC bypass, suspicious service creation</td>
+              <td>T1548 / T1134</td>
+              <td><span class="sev critical">CRITICAL</span></td>
             </tr>
           </tbody>
         </table>
@@ -1303,6 +1319,161 @@ recovery:
 logs:
   retention_days: 90
   legal_hold: false</pre>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========== DEVSECOPS PIPELINE ========== -->
+      <section id="devsecops" class="section">
+        <h1>DevSecOps Pipeline — Detection as Code</h1>
+        <p>DRRA treats detection rules as first-class code — versioned, reviewed, tested, and deployed through a CI/CD pipeline. This section explains how Sigma rules power the detection engine and how the full policy-as-code ecosystem works.</p>
+
+        <h2>What is Sigma?</h2>
+        <div class="card vigil">
+          <ul>
+            <li><strong>Industry-standard detection rule format</strong> — like Snort rules for SIEMs. Write once, deploy everywhere.</li>
+            <li><strong>Plain YAML</strong> — readable and reviewable by security engineers AND developers, not just SIEM specialists.</li>
+            <li><strong>Platform-agnostic</strong> — one Sigma rule compiles to Splunk SPL, Elasticsearch DSL, Azure Sentinel KQL, IBM QRadar, and Google Chronicle YARA-L.</li>
+            <li><strong>Part of the DevSecOps pipeline</strong> — rules are treated like code: version-controlled, pull-request reviewed, and CI-validated before merge.</li>
+          </ul>
+        </div>
+
+        <h2>Sigma in DRRA</h2>
+        <div class="two-col">
+          <div class="card">
+            <h3>Rules Library</h3>
+            <ul>
+              <li>DRRA ships with <strong>4 Sigma rules</strong> covering all major ransomware phases</li>
+              <li>Rules live in <code>drra-policies/sigma/</code> — versioned with the codebase</li>
+              <li>Each rule maps to a MITRE ATT&amp;CK technique</li>
+              <li>VIGIL consumes compiled rules at runtime for real-time detection</li>
+            </ul>
+          </div>
+          <div class="card">
+            <h3>CI/CD Integration</h3>
+            <ul>
+              <li><strong>sigma-cli</strong> validates rule syntax on every commit</li>
+              <li><strong>pytest</strong> runs behavioral tests against known-good and known-bad samples</li>
+              <li>Failed validation <strong>blocks merge</strong> — no broken rules reach production</li>
+              <li>Auto-deploy to VIGIL on merge to <code>main</code></li>
+            </ul>
+          </div>
+        </div>
+
+        <h2>DevSecOps Flow</h2>
+        <div class="arch-diagram">
+          <div class="row">
+            <div class="arch-box vi" style="min-width:160px">
+              Write Sigma YAML
+              <div class="sub">drra-policies/sigma/</div>
+            </div>
+            <div class="arch-arrow" style="align-self:center">&#x2192;</div>
+            <div class="arch-box fg" style="min-width:120px">
+              Git PR
+              <div class="sub">Code review</div>
+            </div>
+            <div class="arch-arrow" style="align-self:center">&#x2192;</div>
+            <div class="arch-box" style="border-color:var(--warn);color:var(--warn);background:rgba(245,166,35,.08);min-width:150px">
+              CI Validates
+              <div class="sub">sigma-cli + pytest</div>
+            </div>
+            <div class="arch-arrow" style="align-self:center">&#x2192;</div>
+            <div class="arch-box sh" style="min-width:120px">
+              Merge
+              <div class="sub">main branch</div>
+            </div>
+            <div class="arch-arrow" style="align-self:center">&#x2192;</div>
+            <div class="arch-box dash" style="max-width:180px">
+              Auto-deploy to VIGIL
+              <div class="sub">Runtime detection active</div>
+            </div>
+          </div>
+        </div>
+
+        <h2>Sigma to Platform Conversion</h2>
+        <p>One Sigma rule compiles to multiple platform-native query languages. DRRA's CI pipeline validates each compilation target.</p>
+        <table>
+          <thead><tr><th>Rule</th><th>Splunk SPL</th><th>Elasticsearch</th><th>Azure Sentinel</th><th>DRRA VIGIL</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><code>ransomware_mass_modification.yml</code></td>
+              <td>&#x2705;</td><td>&#x2705;</td><td>&#x2705;</td><td>&#x2705;</td>
+            </tr>
+            <tr>
+              <td><code>ransomware_vss_deletion.yml</code></td>
+              <td>&#x2705;</td><td>&#x2705;</td><td>&#x2705;</td><td>&#x2705;</td>
+            </tr>
+            <tr>
+              <td><code>ransomware_lateral_movement.yml</code></td>
+              <td>&#x2705;</td><td>&#x2705;</td><td>&#x2705;</td><td>&#x2705;</td>
+            </tr>
+            <tr>
+              <td><code>ransomware_privilege_escalation.yml</code></td>
+              <td>&#x2705;</td><td>&#x2705;</td><td>&#x2705;</td><td>&#x2705;</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h2>4 Rules Coverage</h2>
+        <table>
+          <thead><tr><th>Rule</th><th>File</th><th>MITRE ATT&amp;CK</th><th>Severity</th><th>Phase</th></tr></thead>
+          <tbody>
+            <tr>
+              <td>Mass File Modification</td>
+              <td><code>ransomware_mass_modification.yml</code></td>
+              <td>T1486</td>
+              <td><span class="sev critical">CRITICAL</span></td>
+              <td>Execution</td>
+            </tr>
+            <tr>
+              <td>VSS Shadow Copy Deletion</td>
+              <td><code>ransomware_vss_deletion.yml</code></td>
+              <td>T1490</td>
+              <td><span class="sev critical">CRITICAL</span></td>
+              <td>Impact</td>
+            </tr>
+            <tr>
+              <td>Lateral Movement</td>
+              <td><code>ransomware_lateral_movement.yml</code></td>
+              <td>T1021 / T1078</td>
+              <td><span class="sev high">HIGH</span></td>
+              <td>Lateral</td>
+            </tr>
+            <tr>
+              <td>Privilege Escalation</td>
+              <td><code>ransomware_privilege_escalation.yml</code></td>
+              <td>T1548 / T1134</td>
+              <td><span class="sev critical">CRITICAL</span></td>
+              <td>Privilege</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <h2>Policy as Code Ecosystem</h2>
+        <div class="detect-grid">
+          <div class="detect-card">
+            <div class="detect-icon">&#x1F4CB;</div>
+            <h4>Sigma</h4>
+            <p style="font-size:.82rem;color:var(--muted)">Runtime detection rules — behavioral patterns, process events, network connections. Deployed to VIGIL and any SIEM.</p>
+            <div class="threshold">drra-policies/sigma/</div>
+          </div>
+          <div class="detect-card">
+            <div class="detect-icon">&#x2696;&#xFE0F;</div>
+            <h4>OPA (Open Policy Agent)</h4>
+            <p style="font-size:.82rem;color:var(--muted)">Governance decisions — isolation authorization, blast radius limits, recovery validation, immutability enforcement.</p>
+            <div class="threshold">drra-policies/opa/</div>
+          </div>
+          <div class="detect-card">
+            <div class="detect-icon">&#x1F50D;</div>
+            <h4>Semgrep</h4>
+            <p style="font-size:.82rem;color:var(--muted)">Static analysis — enforces secure coding patterns, prevents weak crypto, mandates immutable logging before execution.</p>
+            <div class="threshold">drra-policies/semgrep/</div>
+          </div>
+          <div class="detect-card">
+            <div class="detect-icon">&#x1F4D6;</div>
+            <h4>Playbooks</h4>
+            <p style="font-size:.82rem;color:var(--muted)">Incident response orchestration — automated SOAR workflows triggered by VIGIL events, mapped to MITRE ATT&amp;CK phases.</p>
+            <div class="threshold">drra-policies/playbooks/</div>
           </div>
         </div>
       </section>
@@ -1405,6 +1576,10 @@ pytest tests/ --cov=backend --cov-report=html</pre>
           </tbody>
         </table>
 
+        <h2>Postman Collection</h2>
+        <p>Import the Postman collection for interactive API testing and conference demos:</p>
+        <pre>tests/postman/DRRA-Postman-Collection.postman_collection.json</pre>
+
         <h2>Project Structure</h2>
         <pre>ransomwaredefense/
 ├── backend/              # FastAPI core — routes, services, models
@@ -1412,19 +1587,20 @@ pytest tests/ --cov=backend --cov-report=html</pre>
 │   ├── routes/           # API endpoint handlers
 │   └── services/         # Business logic (forge, vigil, shield)
 ├── vigil/                # WALL — ML detection & telemetry (Python)
-├── forge/                # Simulation & payload testing (stub)
-├── shield/               # SQUAT/GRAB — response & recovery (stub)
 ├── dashboard/            # React/TypeScript frontend
 ├── watchers/             # Rust file monitoring (tokio + rayon)
 ├── infra/                # Ansible, Kubernetes, Docker configs
 ├── tests/                # CI/CD test suite (The Gauntlet)
+│   └── postman/          # Postman collection for API testing
+├── scripts/              # Demo and utility scripts
 ├── drra-policies/        # Sigma, OPA, Semgrep rules
 │   ├── sigma/            # Detection rules (SIEM-deployable)
 │   ├── opa/              # Governance policies
 │   ├── semgrep/          # Secure coding rules
 │   ├── playbooks/        # Incident response orchestration
 │   └── hardening/        # Post-recovery hardening
-├── docs/                 # Architecture & design docs
+├── docs/                 # HTML documentation site + architecture
+│   └── conference-2026/  # Conference materials
 └── docker-compose.yml    # Container orchestration</pre>
       </section>
 
@@ -1434,7 +1610,7 @@ pytest tests/ --cov=backend --cov-report=html</pre>
       <strong>Resilience Forge (DRRA)</strong> — Building infrastructure that survives the unthinkable. &nbsp;|&nbsp;
       WALL-SQUAT-GRAB Framework &nbsp;|&nbsp;
       <a href="http://localhost:8000/docs">API Docs</a> &nbsp;|&nbsp;
-      <a href="ARCHITECTURE.md">Architecture Guide</a>
+      <a href="#devsecops" onclick="navigate('devsecops',document.querySelector('.nav-link[href=\'#devsecops\']'));return false;">DevSecOps Pipeline</a>
     </footer>
   </div><!-- /main -->
 </div><!-- /app -->
@@ -1452,6 +1628,7 @@ pytest tests/ --cov=backend --cov-report=html</pre>
     components: 'Components',
     api: 'API Reference',
     detection: 'Detection Engine',
+    devsecops: 'DevSecOps Pipeline',
     quickstart: 'Quick Start',
   };
 
