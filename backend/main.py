@@ -51,7 +51,7 @@ async def lifespan(app: FastAPI):
 # Create FastAPI application
 app = FastAPI(
     title="Resilience Forge (DRRA)",
-    description="Damn Resilient Ransomware App - Industry standard for ransomware-proof ecosystems",
+    description="Distributed Resilience & Recovery Architecture - Industry standard for ransomware-proof ecosystems",
     version="0.1.0",
     lifespan=lifespan
 )
