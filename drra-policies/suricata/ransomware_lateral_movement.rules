@@ -1,0 +1,158 @@
+# DRRA Suricata Rules: Lateral Movement Detection
+# Detects SMB exploitation, Kerberos abuse, RDP attacks, and WMI lateral movement.
+#
+# MITRE ATT&CK: T1021 (Remote Services), T1550 (Use Alternate Auth Material),
+#               T1558 (Steal or Forge Kerberos Tickets)
+
+# ---------------------------------------------------------------------------
+# SMB Lateral Movement
+# ---------------------------------------------------------------------------
+
+# SMB admin share access from workstation to workstation (not DC)
+alert smb any any -> $HOME_NET any (
+    msg:"DRRA Lateral Movement - SMB Admin Share Access Workstation to Workstation";
+    flow:established,to_server;
+    smb.named_pipe; content:"\\ADMIN$";
+    classtype:policy-violation;
+    reference:url,attack.mitre.org/techniques/T1021/002;
+    sid:9002001; rev:2;
+)
+
+# PsExec lateral movement indicator
+alert smb any any -> $HOME_NET any (
+    msg:"DRRA Lateral Movement - PsExec Service Installation via SMB";
+    flow:established,to_server;
+    smb.named_pipe; content:"\\PSEXESVC";
+    classtype:trojan-activity;
+    reference:url,attack.mitre.org/software/S0029;
+    sid:9002002; rev:2;
+)
+
+# EternalBlue / MS17-010 exploit attempt
+alert tcp $EXTERNAL_NET any -> $HOME_NET 445 (
+    msg:"DRRA Lateral Movement - EternalBlue SMB Exploit Attempt (MS17-010)";
+    flow:established,to_server;
+    content:"|00 00 00 90|"; depth:4;
+    content:"|FF|SMB|72 00 00 00 00 18 01 20|";
+    classtype:attempted-admin;
+    reference:cve,CVE-2017-0144;
+    reference:url,attack.mitre.org/techniques/T1210;
+    sid:9002010; rev:3;
+)
+
+# ---------------------------------------------------------------------------
+# RDP Brute Force / Attacks
+# ---------------------------------------------------------------------------
+
+# RDP brute force detection
+alert tcp $EXTERNAL_NET any -> $HOME_NET 3389 (
+    msg:"DRRA Lateral Movement - RDP Brute Force Attempt";
+    flow:established,to_server;
+    detection_filter:track by_src, count 5, seconds 60;
+    classtype:attempted-admin;
+    reference:url,attack.mitre.org/techniques/T1110;
+    sid:9002020; rev:2;
+)
+
+# RDP connection from unexpected internal segment
+alert tcp $HOME_NET any -> $HOME_NET 3389 (
+    msg:"DRRA Lateral Movement - Internal RDP Lateral Movement";
+    flow:established,to_server;
+    detection_filter:track by_src, count 3, seconds 120;
+    classtype:policy-violation;
+    reference:url,attack.mitre.org/techniques/T1021/001;
+    sid:9002021; rev:2;
+)
+
+# BlueKeep / DejaBlue pre-auth RDP (CVE-2019-0708)
+alert tcp $EXTERNAL_NET any -> $HOME_NET 3389 (
+    msg:"DRRA Lateral Movement - Possible BlueKeep RDP Exploit (CVE-2019-0708)";
+    flow:established,to_server;
+    content:"|03 00|";
+    depth:2;
+    content:"|e0|";
+    within:3;
+    dsize:>300; dsize:<500;
+    classtype:attempted-admin;
+    reference:cve,CVE-2019-0708;
+    sid:9002022; rev:2;
+)
+
+# ---------------------------------------------------------------------------
+# Kerberos Attacks
+# ---------------------------------------------------------------------------
+
+# Kerberoasting - excessive TGS requests (service ticket requests for offline cracking)
+alert krb5 $HOME_NET any -> $HOME_NET 88 (
+    msg:"DRRA Lateral Movement - Possible Kerberoasting - Excessive TGS-REQ";
+    flow:established,to_server;
+    krb5.msg_type:12;
+    detection_filter:track by_src, count 10, seconds 60;
+    classtype:attempted-user;
+    reference:url,attack.mitre.org/techniques/T1558/003;
+    sid:9002030; rev:2;
+)
+
+# AS-REP Roasting - request for TGT without pre-auth
+alert krb5 $HOME_NET any -> $HOME_NET 88 (
+    msg:"DRRA Lateral Movement - Possible AS-REP Roasting";
+    flow:established,to_server;
+    krb5.msg_type:10;
+    krb5.pre_auth_type:!2;
+    classtype:attempted-user;
+    reference:url,attack.mitre.org/techniques/T1558/004;
+    sid:9002031; rev:2;
+)
+
+# Pass-the-ticket / overpass-the-hash (unusual Kerberos from workstation)
+alert krb5 $HOME_NET any -> $HOME_NET 88 (
+    msg:"DRRA Lateral Movement - Possible Pass-the-Ticket Attack";
+    flow:established,to_server;
+    krb5.msg_type:12;
+    krb5.encryption_type:17;  # AES128 - atypical for normal domain auth
+    detection_filter:track by_src, count 3, seconds 30;
+    classtype:attempted-admin;
+    reference:url,attack.mitre.org/techniques/T1550/003;
+    sid:9002032; rev:2;
+)
+
+# ---------------------------------------------------------------------------
+# WMI Remote Execution
+# ---------------------------------------------------------------------------
+
+# WMI over DCOM (TCP 135 + high port) - common for lateral movement
+alert tcp $HOME_NET any -> $HOME_NET 135 (
+    msg:"DRRA Lateral Movement - WMI DCOM Remote Execution";
+    flow:established,to_server;
+    content:"|05 00 0b|";
+    depth:3;
+    content:"|de a0 c2 00 00 00 00 00 c0 00 00 00 00 00 00 46|";
+    classtype:policy-violation;
+    reference:url,attack.mitre.org/techniques/T1021/003;
+    sid:9002040; rev:2;
+)
+
+# ---------------------------------------------------------------------------
+# NTLM Relay Attacks
+# ---------------------------------------------------------------------------
+
+# NTLM relay - unusual authentication source
+alert tcp $HOME_NET any -> $HOME_NET [139,445] (
+    msg:"DRRA Lateral Movement - Possible NTLM Relay Attack";
+    flow:established,to_server;
+    content:"|4e 54 4c 4d 53 53 50 00|";  # NTLMSSP signature
+    depth:8;
+    offset:0;
+    detection_filter:track by_src, count 5, seconds 30;
+    classtype:attempted-admin;
+    reference:url,attack.mitre.org/techniques/T1557/001;
+    sid:9002050; rev:2;
+)
+
+# Responder / LLMNR poisoning
+alert udp $HOME_NET any -> 224.0.0.252 5355 (
+    msg:"DRRA Lateral Movement - LLMNR Query to Multicast (Possible Responder)";
+    classtype:policy-violation;
+    reference:url,attack.mitre.org/techniques/T1557/001;
+    sid:9002051; rev:1;
+)

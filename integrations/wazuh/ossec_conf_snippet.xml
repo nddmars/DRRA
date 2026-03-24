@@ -1,0 +1,112 @@
+<!--
+  DRRA Wazuh Configuration Snippet
+  Add the relevant sections to your /var/ossec/etc/ossec.conf
+
+  REQUIRED:
+    1. Syslog input to receive DRRA VIGIL events
+    2. File Integrity Monitoring for protected paths
+    3. Active Response binding for automatic SHIELD isolation
+    4. Custom rule reference
+-->
+
+<!-- =========================================================
+     1. DRRA VIGIL Syslog Input
+     DRRA backend sends detection events to Wazuh via syslog.
+     Configure DRRA with: WAZUH_SYSLOG_HOST=<wazuh_manager_ip>
+     ========================================================= -->
+<ossec_config>
+  <remote>
+    <connection>syslog</connection>
+    <port>514</port>
+    <protocol>udp</protocol>
+    <allowed-ips>127.0.0.1/8</allowed-ips>  <!-- Restrict to DRRA backend IPs -->
+    <local_ip>0.0.0.0</local_ip>
+  </remote>
+</ossec_config>
+
+<!-- =========================================================
+     2. File Integrity Monitoring (FIM)
+     Monitors paths for ransomware extension additions and ransom notes.
+     ========================================================= -->
+<ossec_config>
+  <syscheck>
+    <!-- Monitor user data paths - adjust for your environment -->
+    <directories check_all="yes" realtime="yes" report_changes="yes">
+      /home
+    </directories>
+    <directories check_all="yes" realtime="yes" report_changes="yes">
+      /srv/shares
+    </directories>
+    <directories check_all="yes" realtime="yes" report_changes="yes">
+      /mnt
+    </directories>
+
+    <!-- Ignore common high-churn paths to reduce noise -->
+    <ignore>/home/*/.cache</ignore>
+    <ignore>/home/*/.local/share/recently-used.xbel</ignore>
+    <ignore>/tmp</ignore>
+
+    <!-- Alert on these ransomware patterns regardless of other settings -->
+    <nodiff>/home/*/.ssh/authorized_keys</nodiff>
+  </syscheck>
+</ossec_config>
+
+<!-- =========================================================
+     3. Active Response - DRRA SHIELD Isolation
+     Calls drra_isolate.sh when ransomware rules fire.
+     ========================================================= -->
+<ossec_config>
+  <active-response>
+    <command>drra_isolate</command>
+    <location>local</location>
+    <rules_id>200001,200002,200003,200004,200021,200022,200030,200090,200091</rules_id>
+    <timeout>0</timeout>  <!-- No auto-unblock - DRRA SHIELD controls release -->
+  </active-response>
+
+  <command>
+    <name>drra_isolate</name>
+    <executable>drra_isolate.sh</executable>
+    <timeout_allowed>no</timeout_allowed>
+  </command>
+</ossec_config>
+
+<!-- =========================================================
+     4. Custom Rules Reference
+     ========================================================= -->
+<ossec_config>
+  <rules>
+    <include>rules/drra_ransomware_rules.xml</include>
+  </rules>
+</ossec_config>
+
+<!-- =========================================================
+     5. Log Analysis - DRRA Backend Logs
+     Direct DRRA backend stdout/stderr to Wazuh log collection.
+     ========================================================= -->
+<ossec_config>
+  <localfile>
+    <log_format>json</log_format>
+    <location>/var/log/drra/vigil.json</location>
+    <label key="source">drra_vigil</label>
+  </localfile>
+
+  <localfile>
+    <log_format>json</log_format>
+    <location>/var/log/drra/shield.json</location>
+    <label key="source">drra_shield</label>
+  </localfile>
+</ossec_config>
+
+<!-- =========================================================
+     6. Alerts Output (forward matching alerts to DRRA VIGIL)
+     Optional: mirror high-severity Wazuh alerts back to DRRA
+     for correlation with other VIGIL events.
+     ========================================================= -->
+<ossec_config>
+  <integration>
+    <name>custom-drra</name>
+    <hook_url>http://localhost:8000/api/v1/vigil/events</hook_url>
+    <level>12</level>
+    <alert_format>json</alert_format>
+  </integration>
+</ossec_config>

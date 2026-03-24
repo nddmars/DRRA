@@ -1,0 +1,141 @@
+name: DRRA.Ransomware.ActiveHunt
+description: |
+  Live threat hunt for ransomware precursors and active encryption.
+  Runs continuously and streams detections to DRRA VIGIL via API.
+
+  Hunts for:
+    - High-entropy file writes (active encryption)
+    - VSS deletion commands in running processes
+    - LSASS memory access patterns
+    - Known ransomware extension additions
+    - C2 beaconing (small regular outbound POSTs)
+    - Shadow copy service tampering
+
+  Schedule this as a recurring Velociraptor hunt across your fleet.
+
+author: DRRA
+version: "1.0"
+
+type: CLIENT_EVENT
+
+parameters:
+  - name: EntropyThreshold
+    description: Shannon entropy threshold for file write alerts (0.0–1.0)
+    type: float
+    default: 0.85
+
+  - name: DRRAApiUrl
+    description: DRRA VIGIL API endpoint
+    default: "http://drra-backend:8000"
+
+  - name: MassModThreshold
+    description: Number of file modifications per minute to trigger mass modification alert
+    type: int
+    default: 50
+
+sources:
+  # -------------------------------------------------------------------------
+  # Real-time high-entropy file writes
+  # -------------------------------------------------------------------------
+  - name: HighEntropyWrites
+    description: Monitor file system for high-entropy writes (encryption indicator)
+    query: |
+      LET FileWrites = watch_usn(drive="C:")
+
+      SELECT
+        FullPath,
+        Name,
+        Size,
+        timestamp(epoch=now()) AS DetectedAt,
+        entropy(path=FullPath) AS Entropy,
+        "entropy_spike"        AS EventType
+      FROM FileWrites
+      WHERE NOT IsDir
+        AND entropy(path=FullPath) > EntropyThreshold
+        AND NOT FullPath =~ "(?i)(\\.exe|\\.dll|\\.sys|\\.zip|\\.gz|\\.7z|\\.mp4|\\.mp3|\\.jpg|\\.png)$"
+
+  # -------------------------------------------------------------------------
+  # Mass file modification counter
+  # -------------------------------------------------------------------------
+  - name: MassModification
+    description: Count file modifications per minute; alert if threshold exceeded
+    query: |
+      LET FileWrites = watch_usn(drive="C:")
+
+      LET Counts = SELECT
+        count() AS FileCount,
+        now()   AS Window
+      FROM FileWrites
+      WHERE NOT IsDir
+      GROUP BY int(int=now() / 60)
+
+      SELECT
+        FileCount,
+        Window,
+        "mass_modification" AS EventType
+      FROM Counts
+      WHERE FileCount > MassModThreshold
+
+  # -------------------------------------------------------------------------
+  # VSS deletion commands in running processes
+  # -------------------------------------------------------------------------
+  - name: VSSDeletion
+    description: Detect VSS deletion commands as they execute
+    query: |
+      SELECT
+        Pid,
+        Ppid,
+        Name,
+        CommandLine,
+        CreateTime,
+        "vss_deletion" AS EventType
+      FROM watch_etw(
+        guid="{22FB2CD6-0E7B-422B-A0C7-2FAD1FD0E716}",  -- Microsoft-Windows-Kernel-Process
+        any=0x10
+      )
+      WHERE CommandLine =~ "(?i)(vssadmin.*delete|wmic.*shadowcopy.*delete|bcdedit.*recoveryenabled.*no|wbadmin.*delete)"
+
+  # -------------------------------------------------------------------------
+  # LSASS access detection
+  # -------------------------------------------------------------------------
+  - name: LsassAccess
+    description: Detect unauthorized LSASS memory access (credential dumping)
+    query: |
+      SELECT
+        System.TimeCreated.SystemTime AS TimeCreated,
+        EventData.SourceProcessName   AS SourceProcess,
+        EventData.TargetProcessName   AS TargetProcess,
+        EventData.GrantedAccess       AS GrantedAccess,
+        "credential_theft"            AS EventType
+      FROM parse_evtx(filename="C:\\Windows\\System32\\winevt\\Logs\\Security.evtx")
+      WHERE System.EventID.Value = 4656
+        AND EventData.TargetProcessName =~ "(?i)lsass\\.exe"
+        AND EventData.GrantedAccess IN ("0x1010", "0x1410", "0x40", "0x1fffff", "0x143a")
+
+  # -------------------------------------------------------------------------
+  # Forward all detections to DRRA VIGIL in real-time
+  # -------------------------------------------------------------------------
+  - name: StreamToDRRA
+    description: Ship detection events to DRRA VIGIL API
+    query: |
+      LET AllEvents = SELECT * FROM chain(
+        a=HighEntropyWrites,
+        b=MassModification,
+        c=VSSDeletion,
+        d=LsassAccess
+      )
+
+      SELECT *,
+        http_client(
+          url  = DRRAApiUrl + "/api/v1/vigil/events",
+          data = serialize(item=dict(
+            event_type = EventType,
+            source     = "velociraptor",
+            hostname   = info().Hostname,
+            timestamp  = timestamp(epoch=now()),
+            metadata   = _value
+          ), format="json"),
+          headers = dict(`Content-Type`="application/json"),
+          method  = "POST"
+        ) AS DRRAResponse
+      FROM AllEvents

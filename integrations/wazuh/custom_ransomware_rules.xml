@@ -1,0 +1,164 @@
+<!--
+  DRRA Wazuh Custom Rules: Ransomware Detection
+  Place this file in /var/ossec/etc/rules/drra_ransomware_rules.xml
+  and restart Wazuh: systemctl restart wazuh-manager
+
+  Compatible with: Wazuh 4.x+
+  Rule ID range: 200000–200099 (local custom rules)
+-->
+
+<group name="drra,ransomware,">
+
+  <!-- =====================================================================
+       VIGIL DETECTION EVENT RULES
+       Triggered when the DRRA backend generates detection events via syslog
+       ===================================================================== -->
+
+  <!-- DRRA base rule - all VIGIL events -->
+  <rule id="200000" level="1">
+    <decoded_as>json</decoded_as>
+    <field name="source">drra_vigil</field>
+    <description>DRRA VIGIL Detection Event</description>
+    <group>drra_vigil,</group>
+  </rule>
+
+  <!-- Entropy spike detected -->
+  <rule id="200001" level="12" frequency="1" timeframe="60">
+    <if_group>drra_vigil</if_group>
+    <field name="event_type">entropy_spike</field>
+    <description>DRRA VIGIL: High-entropy file activity detected (possible encryption)</description>
+    <mitre>
+      <id>T1486</id>
+    </mitre>
+    <group>ransomware,encryption_activity,</group>
+  </rule>
+
+  <!-- Mass file modification -->
+  <rule id="200002" level="14">
+    <if_group>drra_vigil</if_group>
+    <field name="event_type">mass_modification</field>
+    <description>DRRA VIGIL: Mass file modification detected (ransomware encryption loop)</description>
+    <mitre>
+      <id>T1486</id>
+    </mitre>
+    <group>ransomware,mass_modification,</group>
+  </rule>
+
+  <!-- VSS deletion detected -->
+  <rule id="200003" level="15">
+    <if_group>drra_vigil</if_group>
+    <field name="event_type">vss_deletion</field>
+    <description>DRRA VIGIL: Volume Shadow Copy deletion attempt (ransomware pre-encryption)</description>
+    <mitre>
+      <id>T1490</id>
+    </mitre>
+    <group>ransomware,vss_deletion,critical,</group>
+  </rule>
+
+  <!-- Lateral movement detected -->
+  <rule id="200004" level="13">
+    <if_group>drra_vigil</if_group>
+    <field name="event_type">lateral_movement</field>
+    <description>DRRA VIGIL: Lateral movement detected</description>
+    <mitre>
+      <id>T1021</id>
+      <id>T1550</id>
+    </mitre>
+    <group>ransomware,lateral_movement,</group>
+  </rule>
+
+  <!-- SHIELD isolation triggered -->
+  <rule id="200010" level="10">
+    <if_group>drra_vigil</if_group>
+    <field name="event_type">isolation_triggered</field>
+    <description>DRRA SHIELD: Automatic host isolation initiated</description>
+    <group>ransomware,response_action,</group>
+  </rule>
+
+  <!-- =====================================================================
+       WINDOWS EVENT LOG RULES (Sysmon + Windows Security)
+       ===================================================================== -->
+
+  <!-- VSS admin command via Windows Event 4688 (process creation) -->
+  <rule id="200020" level="14">
+    <if_sid>61603</if_sid>  <!-- Wazuh built-in: process creation -->
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)(vssadmin.*delete|wmic.*shadowcopy.*delete|bcdedit.*recoveryenabled.*no)</field>
+    <description>Ransomware Pre-Stage: Volume Shadow Copy deletion command executed</description>
+    <mitre>
+      <id>T1490</id>
+    </mitre>
+    <group>ransomware,vss_deletion,</group>
+  </rule>
+
+  <!-- Ransomware note file creation -->
+  <rule id="200021" level="12">
+    <if_sid>554</if_sid>  <!-- Wazuh: file integrity monitoring - file added -->
+    <field name="file" type="pcre2">(?i)(HOW_TO_DECRYPT|DECRYPT_FILES|README\.TXT|RECOVERY_INSTRUCTIONS|YOUR_FILES_ARE_ENCRYPTED)</field>
+    <description>Ransomware Indicator: Ransom note file created on monitored path</description>
+    <mitre>
+      <id>T1486</id>
+    </mitre>
+    <group>ransomware,ransom_note,</group>
+  </rule>
+
+  <!-- Known ransomware extension on monitored files -->
+  <rule id="200022" level="12" frequency="10" timeframe="120">
+    <if_sid>554</if_sid>
+    <field name="file" type="pcre2">(?i)\.(locked|enc|encrypted|crypto|crypt|ryk|RYK|hive|lockbit|blackcat|royal|conti)$</field>
+    <description>Ransomware Indicator: File renamed with known ransomware extension</description>
+    <mitre>
+      <id>T1486</id>
+    </mitre>
+    <group>ransomware,encrypted_extension,</group>
+  </rule>
+
+  <!-- LSASS memory access (credential harvesting before ransomware) -->
+  <rule id="200030" level="13">
+    <if_sid>61612</if_sid>  <!-- Wazuh: Sysmon process access -->
+    <field name="win.eventdata.targetImage" type="pcre2">(?i)lsass\.exe</field>
+    <field name="win.eventdata.grantedAccess" type="pcre2">0x1010|0x1410|0x143a|0x40|0x1fffff</field>
+    <description>Ransomware Pre-Stage: LSASS memory access - possible credential dumping</description>
+    <mitre>
+      <id>T1003.001</id>
+    </mitre>
+    <group>ransomware,credential_dumping,</group>
+  </rule>
+
+  <!-- PowerShell encoded command (common ransomware dropper) -->
+  <rule id="200031" level="11">
+    <if_sid>61603</if_sid>
+    <field name="win.eventdata.commandLine" type="pcre2">(?i)powershell.*(-enc|-encodedcommand|-e\s+[A-Za-z0-9+/]{50,})</field>
+    <description>Ransomware Pre-Stage: PowerShell encoded command execution</description>
+    <mitre>
+      <id>T1059.001</id>
+    </mitre>
+    <group>ransomware,powershell_encoded,</group>
+  </rule>
+
+  <!-- =====================================================================
+       CORRELATION RULES (multi-event attack chains)
+       ===================================================================== -->
+
+  <!-- Composite: entropy spike + ransom note within 5 minutes = active ransomware -->
+  <rule id="200090" level="15" frequency="2" timeframe="300">
+    <if_sid>200001,200021</if_sid>
+    <same_source_ip />
+    <description>CRITICAL: Active Ransomware Encryption Detected - Entropy spike AND ransom note on same host</description>
+    <mitre>
+      <id>T1486</id>
+    </mitre>
+    <group>ransomware,critical,active_encryption,</group>
+  </rule>
+
+  <!-- Composite: lateral movement + mass modification = propagating ransomware -->
+  <rule id="200091" level="15" frequency="2" timeframe="600">
+    <if_sid>200004,200002</if_sid>
+    <description>CRITICAL: Ransomware Propagation Detected - Lateral movement followed by mass file modification</description>
+    <mitre>
+      <id>T1021</id>
+      <id>T1486</id>
+    </mitre>
+    <group>ransomware,critical,propagation,</group>
+  </rule>
+
+</group>

@@ -1,0 +1,195 @@
+| =========================================================================
+| DRRA Splunk Saved Searches & Correlation Rules
+| Import via Splunk UI: Settings → Searches, Reports and Alerts
+| Or deploy as a Splunk App in $SPLUNK_HOME/etc/apps/drra/
+|
+| Index: drra_events (create with: index=drra_events)
+| Sourcetype: drra:vigil, drra:shield, drra:forge
+| =========================================================================
+
+| =========================================================================
+| SEARCH 1: Active Ransomware Encryption (Real-time alert)
+| Schedule: Every 1 minute | Alert if count > 0
+| =========================================================================
+index=drra_events sourcetype="drra:vigil" event_type="entropy_spike"
+| eval entropy_pct = round(entropy_score * 100, 1)
+| where entropy_score > 0.85
+| stats
+    count              AS spike_count,
+    avg(entropy_score) AS avg_entropy,
+    max(entropy_score) AS max_entropy,
+    values(hostname)   AS affected_hosts,
+    values(source_ip)  AS source_ips,
+    earliest(_time)    AS first_seen,
+    latest(_time)      AS last_seen
+  by hostname
+| where spike_count >= 3
+| eval alert_severity = case(
+    max_entropy > 0.97, "critical",
+    max_entropy > 0.92, "high",
+    max_entropy > 0.85, "medium",
+    true(), "low"
+  )
+| table _time hostname spike_count avg_entropy max_entropy alert_severity source_ips first_seen last_seen
+| sort -max_entropy
+
+
+| =========================================================================
+| SEARCH 2: Mass File Modification Detection
+| Schedule: Every 2 minutes | Alert if count > 0
+| =========================================================================
+index=drra_events sourcetype="drra:vigil" event_type="mass_modification"
+| eval modification_rate = files_modified / time_window_seconds * 60
+| where files_modified > 50 OR modification_rate > 15
+| stats
+    sum(files_modified)      AS total_files_modified,
+    avg(modification_rate)   AS avg_rate_per_min,
+    max(modification_rate)   AS peak_rate_per_min,
+    values(affected_paths)   AS paths,
+    dc(hostname)             AS unique_hosts,
+    values(hostname)         AS hostnames
+  by hostname span=2m
+| where total_files_modified > 100
+| eval alert_label = "RANSOMWARE: Mass File Modification - " + hostname
+| table _time hostname total_files_modified avg_rate_per_min peak_rate_per_min paths alert_label
+
+
+| =========================================================================
+| SEARCH 3: VSS Deletion Events (Critical - immediate alert)
+| Schedule: Real-time (5s window)
+| =========================================================================
+(index=drra_events sourcetype="drra:vigil" event_type="vss_deletion")
+OR
+(index=windows sourcetype="WinEventLog:Security" EventCode=4688
+  (CommandLine="*vssadmin*delete*" OR CommandLine="*wmic*shadowcopy*delete*"
+   OR CommandLine="*bcdedit*recoveryenabled*no*" OR CommandLine="*wbadmin*delete*"))
+| eval source_system = if(sourcetype="drra:vigil", "DRRA-VIGIL", "Windows-EventLog")
+| eval mitre_technique = "T1490 - Inhibit System Recovery"
+| stats
+    count,
+    values(source_system) AS detection_source,
+    values(hostname)      AS affected_hosts,
+    values(CommandLine)   AS commands,
+    values(user)          AS users,
+    earliest(_time)       AS first_seen
+  by hostname
+| eval severity = "CRITICAL"
+| table _time severity hostname count detection_source users commands mitre_technique
+
+
+| =========================================================================
+| SEARCH 4: Lateral Movement Correlation
+| Schedule: Every 5 minutes
+| =========================================================================
+index=drra_events sourcetype="drra:vigil" event_type="lateral_movement"
+| eval pivot_host = coalesce(source_host, hostname)
+| eval target_host = coalesce(dest_host, target_hostname)
+| stats
+    count,
+    dc(target_host)       AS unique_targets,
+    values(target_host)   AS targets,
+    values(technique)     AS techniques,
+    min(_time)            AS first_seen,
+    max(_time)            AS last_seen
+  by pivot_host
+| where count >= 2 OR unique_targets >= 2
+| eval spread_velocity = unique_targets / (last_seen - first_seen + 1) * 3600
+| eval severity = case(
+    unique_targets > 10, "critical",
+    unique_targets > 5,  "high",
+    unique_targets > 2,  "medium",
+    true(), "low"
+  )
+| table _time pivot_host count unique_targets targets techniques severity spread_velocity
+
+
+| =========================================================================
+| SEARCH 5: DRRA Defensibility Index Tracking (Dashboard)
+| Schedule: Every 15 minutes | Feeds DefensibilityIndex dashboard panel
+| =========================================================================
+index=drra_events sourcetype="drra:dashboard" metric_name="defensibility_index"
+| timechart
+    avg(score)             AS avg_defensibility,
+    avg(detection_score)   AS detection_component,
+    avg(isolation_score)   AS isolation_component,
+    avg(recovery_score)    AS recovery_component,
+    avg(immutability_score) AS immutability_component
+  span=15m
+| eval baseline = 75
+| eval below_baseline = if(avg_defensibility < baseline, "⚠ Below Baseline", "✓ On Target")
+
+
+| =========================================================================
+| SEARCH 6: Incident Timeline Reconstruction
+| Use: On-demand for post-incident analysis
+| Replace $INCIDENT_ID$ with actual incident ID
+| =========================================================================
+index=drra_events incident_id="$INCIDENT_ID$"
+| eval stage = case(
+    event_type IN ("entropy_spike","mass_modification","vss_deletion","lateral_movement","credential_theft"),
+      "1-Detection",
+    event_type IN ("isolation_triggered","vlan_quarantine","network_block"),
+      "2-Containment",
+    event_type IN ("recovery_started","snapshot_restored","integrity_verified"),
+      "3-Recovery",
+    event_type IN ("hardening_applied","fim_rebaseline","mfa_enforced"),
+      "4-Hardening",
+    true(), "5-Other"
+  )
+| sort _time
+| table _time stage event_type hostname severity confidence metadata llm_summary
+| rename
+    _time        AS "Timestamp",
+    stage        AS "Stage",
+    event_type   AS "Event",
+    hostname     AS "Host",
+    severity     AS "Severity",
+    confidence   AS "Confidence",
+    llm_summary  AS "AI Summary"
+
+
+| =========================================================================
+| SEARCH 7: MTTC (Mean Time to Contain) SLA Compliance
+| Schedule: Every hour | Feeds SLA dashboard
+| =========================================================================
+index=drra_events sourcetype="drra:dashboard" metric_name="incident_closed"
+| eval mttc_minutes = mttc_seconds / 60
+| eval sla_met = if(mttc_seconds <= 60, "✓ SLA Met", "✗ SLA Missed")
+| stats
+    count                         AS total_incidents,
+    avg(mttc_seconds)             AS avg_mttc_sec,
+    median(mttc_seconds)          AS median_mttc_sec,
+    max(mttc_seconds)             AS worst_mttc_sec,
+    sum(eval(if(sla_met="✓ SLA Met",1,0))) AS sla_met_count
+  by date_mday date_month date_year
+| eval sla_pct = round(sla_met_count / total_incidents * 100, 1)
+| eval sla_status = if(sla_pct >= 95, "✓ PASSING", "✗ FAILING")
+| table date_year date_month date_mday total_incidents avg_mttc_sec median_mttc_sec worst_mttc_sec sla_pct sla_status
+
+
+| =========================================================================
+| SEARCH 8: DRRA × Suricata Network Correlation
+| Correlates DRRA host events with Suricata network alerts
+| Schedule: Every 10 minutes
+| =========================================================================
+(index=drra_events sourcetype="drra:vigil")
+OR
+(index=suricata sourcetype="suricata:alert" alert.category IN ("trojan-activity","attempted-admin","policy-violation"))
+| eval
+    host_key = coalesce(hostname, src_ip, "unknown"),
+    event_source = case(
+        sourcetype="drra:vigil",    "DRRA",
+        sourcetype="suricata:alert", "Suricata",
+        true(), "Other"
+    )
+| stats
+    dc(event_source) AS source_count,
+    values(event_source) AS sources,
+    count AS total_events,
+    values(alert.signature) AS network_alerts,
+    values(event_type) AS host_events
+  by host_key span=10m
+| where source_count >= 2  -- Only show hosts seen in BOTH DRRA and Suricata
+| eval correlated_threat_score = total_events * source_count * 10
+| sort -correlated_threat_score
+| table _time host_key total_events sources host_events network_alerts correlated_threat_score
