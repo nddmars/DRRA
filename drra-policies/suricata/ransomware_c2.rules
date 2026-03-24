@@ -1,0 +1,152 @@
+# DRRA Suricata Rules: Ransomware C2 Communication
+# Detects beaconing, data exfiltration staging, and command-and-control traffic
+# common to major ransomware families.
+#
+# Compatible with: Suricata 6.x+, Snort 3 (with minor modifications)
+# Load order: after ET Open rules, before local.rules
+#
+# MITRE ATT&CK: T1071 (Application Layer Protocol), T1041 (Exfiltration Over C2)
+
+# ---------------------------------------------------------------------------
+# HTTP Beaconing Patterns
+# ---------------------------------------------------------------------------
+
+# Generic ransomware C2 HTTP beacon (high interval, low payload)
+alert http $HOME_NET any -> $EXTERNAL_NET any (
+    msg:"DRRA Ransomware C2 HTTP Beacon - Small Regular POST";
+    flow:established,to_server;
+    http.method; content:"POST";
+    http.uri; content:!".html"; content:!".css"; content:!".js";
+    http.request_body; dsize:<256;
+    detection_filter:track by_src, count 5, seconds 60;
+    threshold:type both, track by_src, count 10, seconds 300;
+    classtype:trojan-activity;
+    reference:url,attack.mitre.org/techniques/T1071;
+    metadata:affected_product Windows, attack_target Client_Endpoint,
+             deployment Perimeter, signature_severity Major,
+             created_at 2024-01-01, updated_at 2025-01-01;
+    sid:9001001; rev:3;
+)
+
+# Ransomware C2 via HTTP with base64-encoded body (key exchange)
+alert http $HOME_NET any -> $EXTERNAL_NET any (
+    msg:"DRRA Ransomware C2 HTTP - Base64 Encoded Body (Key Exchange)";
+    flow:established,to_server;
+    http.method; content:"POST";
+    http.request_body;
+    pcre:"/^[A-Za-z0-9+\/]{64,}={0,2}$/";
+    http.request_body; dsize:>64; dsize:<2048;
+    classtype:trojan-activity;
+    reference:url,attack.mitre.org/techniques/T1132;
+    sid:9001002; rev:2;
+)
+
+# ---------------------------------------------------------------------------
+# Tor / Onion Routing (common for ransom payment sites)
+# ---------------------------------------------------------------------------
+
+# Tor SOCKS5 handshake
+alert tcp $HOME_NET any -> $EXTERNAL_NET any (
+    msg:"DRRA Ransomware C2 - Tor SOCKS5 Proxy Handshake";
+    flow:established,to_server;
+    content:"|05 01 00|";
+    depth:3;
+    classtype:policy-violation;
+    reference:url,attack.mitre.org/techniques/T1090/003;
+    sid:9001010; rev:2;
+)
+
+# DNS query for .onion domains (should not reach DNS resolver on modern systems)
+alert dns $HOME_NET any -> any 53 (
+    msg:"DRRA Ransomware C2 - DNS Query for .onion Domain";
+    dns.query; content:".onion"; endswith;
+    classtype:trojan-activity;
+    reference:url,attack.mitre.org/techniques/T1090/003;
+    sid:9001011; rev:2;
+)
+
+# ---------------------------------------------------------------------------
+# Known Ransomware C2 Infrastructure (Updated 2025-01)
+# Replace with live threat intel from MISP in production
+# ---------------------------------------------------------------------------
+
+# Cobalt Strike default stager URI patterns (used by Ryuk, Conti)
+alert http $HOME_NET any -> $EXTERNAL_NET any (
+    msg:"DRRA Possible Cobalt Strike Stager - Default URI Pattern";
+    flow:established,to_server;
+    http.uri;
+    pcre:"/^\/[a-zA-Z0-9]{4}$/";
+    http.user_agent; content:!"Mozilla";
+    classtype:trojan-activity;
+    reference:url,attack.mitre.org/software/S0154;
+    sid:9001020; rev:3;
+)
+
+# Cobalt Strike HTTPS C2 (certificate-based detection)
+alert tls $HOME_NET any -> $EXTERNAL_NET any (
+    msg:"DRRA Possible Cobalt Strike Default TLS Certificate";
+    tls.subject; content:"CN=Major Cobalt Strike";
+    classtype:trojan-activity;
+    reference:url,attack.mitre.org/software/S0154;
+    sid:9001021; rev:2;
+)
+
+# Cobalt Strike malleable C2 - common default port
+alert tcp $HOME_NET any -> $EXTERNAL_NET 50050 (
+    msg:"DRRA Cobalt Strike Team Server Default Port 50050";
+    flow:established,to_server;
+    classtype:trojan-activity;
+    sid:9001022; rev:1;
+)
+
+# ---------------------------------------------------------------------------
+# Data Exfiltration Staging (Pre-Encryption)
+# ---------------------------------------------------------------------------
+
+# Large outbound transfer to uncommon destination (exfil staging)
+alert tcp $HOME_NET any -> $EXTERNAL_NET any (
+    msg:"DRRA Possible Ransomware Data Exfiltration - Large Outbound Transfer";
+    flow:established,to_server;
+    dsize:>65000;
+    detection_filter:track by_src, count 50, seconds 300;
+    threshold:type both, track by_src, count 100, seconds 600;
+    classtype:policy-violation;
+    reference:url,attack.mitre.org/techniques/T1041;
+    sid:9001030; rev:2;
+)
+
+# Megaupload/file-sharing C2 exfiltration (FTP over unusual ports)
+alert tcp $HOME_NET any -> $EXTERNAL_NET [2121,2222,3333,4444,8888] (
+    msg:"DRRA Possible Ransomware Exfil - FTP on Non-Standard Port";
+    flow:established,to_server;
+    content:"USER "; depth:5;
+    classtype:policy-violation;
+    reference:url,attack.mitre.org/techniques/T1048;
+    sid:9001031; rev:2;
+)
+
+# ---------------------------------------------------------------------------
+# Ransomware-Specific User Agents
+# ---------------------------------------------------------------------------
+
+# Empty or missing User-Agent (common in automated ransomware HTTP clients)
+alert http $HOME_NET any -> $EXTERNAL_NET any (
+    msg:"DRRA Ransomware HTTP - Missing User-Agent Header";
+    flow:established,to_server;
+    http.method; content:"POST";
+    http.header_names; content:!"User-Agent";
+    classtype:trojan-activity;
+    sid:9001040; rev:2;
+)
+
+# Known malicious user agents
+alert http $HOME_NET any -> $EXTERNAL_NET any (
+    msg:"DRRA Ransomware HTTP - Known Malicious User Agent";
+    flow:established,to_server;
+    http.user_agent;
+    pcre:"/(Go-http-client|python-requests\/2\.2[0-9]|curl\/7\.[0-9]{1,2}\.0)/i";
+    http.method; content:"POST";
+    http.request_body; dsize:>100;
+    classtype:trojan-activity;
+    sid:9001041; rev:2;
+)

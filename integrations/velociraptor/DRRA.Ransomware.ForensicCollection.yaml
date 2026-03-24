@@ -1,0 +1,209 @@
+name: DRRA.Ransomware.ForensicCollection
+description: |
+  Comprehensive forensic collection artifact for ransomware incidents.
+  Collects: process list, network connections, encrypted file inventory,
+  ransom notes, registry persistence, prefetch, and DRRA telemetry export.
+
+  Run this artifact on suspected hosts immediately after isolation.
+  Results are automatically forwarded to DRRA's immutable MinIO evidence store.
+
+author: DRRA
+version: "1.2"
+
+type: CLIENT
+
+parameters:
+  - name: TargetPath
+    description: Path to start recursive file scan for encrypted files
+    default: "C:\\"
+
+  - name: RansomwareExtensions
+    description: Comma-separated list of known ransomware extensions to search
+    default: ".locked,.enc,.encrypted,.crypto,.crypt,.ryk,.RYK,.conti,.hive,.lockbit,.blackcat,.royal,.ALPHV"
+
+  - name: MaxFilesPerDir
+    description: Maximum files to inspect per directory (performance limit)
+    type: int
+    default: 5000
+
+  - name: DRRAApiUrl
+    description: DRRA backend API URL for result forwarding
+    default: "http://drra-backend:8000"
+
+  - name: CollectMemory
+    description: Collect process memory dumps for identified malicious PIDs
+    type: bool
+    default: false
+
+sources:
+  # -------------------------------------------------------------------------
+  # Running Processes
+  # -------------------------------------------------------------------------
+  - name: ProcessList
+    description: Full process tree with command lines and hashes
+    query: |
+      SELECT
+        Pid,
+        Ppid,
+        Name,
+        CommandLine,
+        CreateTime,
+        Username,
+        Exe,
+        hash(path=Exe).SHA256 AS SHA256,
+        hash(path=Exe).MD5    AS MD5
+      FROM pslist()
+      ORDER BY CreateTime DESC
+
+  # -------------------------------------------------------------------------
+  # Network Connections
+  # -------------------------------------------------------------------------
+  - name: NetworkConnections
+    description: Active TCP/UDP connections with process attribution
+    query: |
+      SELECT
+        Pid,
+        Process.Name AS ProcessName,
+        Process.Exe  AS ProcessPath,
+        FamilyString AS Protocol,
+        Status,
+        LocalAddress,
+        LocalPort,
+        RemoteAddress,
+        RemotePort,
+        timestamp(epoch=CreateTime) AS ConnectedAt
+      FROM netstat()
+      WHERE RemoteAddress != "0.0.0.0"
+        AND RemoteAddress != "::"
+        AND RemoteAddress != "127.0.0.1"
+      ORDER BY ConnectedAt DESC
+
+  # -------------------------------------------------------------------------
+  # Encrypted File Inventory
+  # -------------------------------------------------------------------------
+  - name: EncryptedFiles
+    description: Files matching known ransomware extensions
+    query: |
+      LET Extensions = split(string=RansomwareExtensions, sep=",")
+
+      SELECT
+        FullPath,
+        Name,
+        Size,
+        Mtime,
+        Atime,
+        hash(path=FullPath).SHA256 AS SHA256,
+        entropy(path=FullPath)     AS Entropy
+      FROM glob(globs=TargetPath + "/**")
+      WHERE NOT IsDir
+        AND get(field=Extension, item=Extensions)
+      LIMIT MaxFilesPerDir * 100
+
+  # -------------------------------------------------------------------------
+  # Ransom Notes
+  # -------------------------------------------------------------------------
+  - name: RansomNotes
+    description: Ransom note files found on disk
+    query: |
+      SELECT
+        FullPath,
+        Name,
+        Size,
+        Mtime,
+        read_file(filename=FullPath, length=65536) AS Content
+      FROM glob(globs=TargetPath + "/**")
+      WHERE NOT IsDir
+        AND Name =~ "(?i)(HOW_TO_DECRYPT|DECRYPT_FILES|README\\.TXT|RECOVERY_INSTRUCTIONS|YOUR_FILES_ARE_ENCRYPTED|HOW_TO_RESTORE)"
+
+  # -------------------------------------------------------------------------
+  # VSS / Shadow Copy Status
+  # -------------------------------------------------------------------------
+  - name: ShadowCopyStatus
+    description: Current VSS shadow copy inventory
+    query: |
+      SELECT *
+      FROM wmi(query="SELECT * FROM Win32_ShadowCopy", namespace="root/cimv2")
+
+  # -------------------------------------------------------------------------
+  # Registry Persistence
+  # -------------------------------------------------------------------------
+  - name: RegistryPersistence
+    description: Common persistence registry keys modified recently
+    query: |
+      SELECT
+        Key.FullPath AS RegistryKey,
+        Name,
+        Data.value  AS Value,
+        Key.Mtime   AS Modified
+      FROM read_reg_key(globs=[
+        "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\\**",
+        "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows\\CurrentVersion\\RunOnce\\**",
+        "HKEY_CURRENT_USER\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\\**",
+        "HKEY_LOCAL_MACHINE\\System\\CurrentControlSet\\Services\\**"
+      ])
+      WHERE Modified > now() - 86400  -- Modified in last 24 hours
+
+  # -------------------------------------------------------------------------
+  # Prefetch Files (execution evidence)
+  # -------------------------------------------------------------------------
+  - name: RecentPrefetch
+    description: Recently executed prefetch entries (execution evidence)
+    query: |
+      SELECT
+        Name,
+        FullPath,
+        Size,
+        Mtime,
+        Atime
+      FROM glob(globs="C:\\Windows\\Prefetch\\*.pf")
+      WHERE Mtime > now() - 86400 * 7  -- Last 7 days
+      ORDER BY Mtime DESC
+
+  # -------------------------------------------------------------------------
+  # Event Log: Process Creation (Windows Security 4688)
+  # -------------------------------------------------------------------------
+  - name: ProcessCreationEvents
+    description: Recent process creation events from Windows Security log
+    query: |
+      SELECT
+        System.TimeCreated.SystemTime AS TimeCreated,
+        EventData.SubjectUserName     AS User,
+        EventData.NewProcessName      AS Process,
+        EventData.CommandLine         AS CommandLine,
+        EventData.ParentProcessName   AS ParentProcess
+      FROM parse_evtx(filename="C:\\Windows\\System32\\winevt\\Logs\\Security.evtx")
+      WHERE System.EventID.Value = 4688
+        AND System.TimeCreated.SystemTime > now() - 86400 * 2
+        AND (
+          EventData.CommandLine =~ "(?i)(vssadmin|bcdedit|wbadmin|wmic.*shadow|powershell.*-enc|mimikatz|sekurlsa)"
+        )
+      ORDER BY TimeCreated DESC
+
+  # -------------------------------------------------------------------------
+  # DRRA Telemetry Export
+  # -------------------------------------------------------------------------
+  - name: DRRATelemetryExport
+    description: Pull recent DRRA detection events for this host from VIGIL API
+    query: |
+      SELECT *
+      FROM http_client(
+        url=DRRAApiUrl + "/api/v1/vigil/events?limit=500",
+        headers=dict(`Content-Type`="application/json"),
+        method="GET"
+      )
+
+postprocessing:
+  # Forward all collection results to DRRA MinIO for immutable storage
+  - name: ForwardToMinIO
+    description: Ship forensic artifacts to DRRA immutable evidence store
+    query: |
+      SELECT
+        upload(
+          file=serialize(item=EncryptedFiles, format="jsonl"),
+          name=format(format="velociraptor/%v/encrypted_files.jsonl", args=[now()])
+        ) AS EncryptedFilesUpload,
+        upload(
+          file=serialize(item=ProcessList, format="jsonl"),
+          name=format(format="velociraptor/%v/process_list.jsonl", args=[now()])
+        ) AS ProcessListUpload
+      FROM scope()

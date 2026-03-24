@@ -1,0 +1,205 @@
+{
+  "comment": "DRRA CrowdStrike Custom IOA Rule Groups",
+  "description": "Custom Indicator of Attack rules for ransomware pre-staging behaviors not covered by default Falcon policies. Import via CrowdStrike Falcon Console → Endpoint Security → Custom IOA.",
+
+  "rule_groups": [
+    {
+      "name": "DRRA - Ransomware Pre-Staging",
+      "description": "Detects ransomware pre-encryption behaviors: VSS deletion, shadow copy abuse, backup destruction.",
+      "platform": "Windows",
+      "enabled": true,
+      "rules": [
+
+        {
+          "name": "VSS Admin Shadow Delete",
+          "description": "vssadmin used to delete shadow copies — ransomware pre-encryption step",
+          "severity": "Critical",
+          "action": "kill_process",
+          "pattern_severity": "Critical",
+          "ruletype_name": "Process Creation",
+          "field_values": [
+            {
+              "name": "GrandparentImageFilename",
+              "type": "set",
+              "values": [".*"]
+            },
+            {
+              "name": "ImageFilename",
+              "type": "set",
+              "values": [".*\\\\vssadmin\\.exe"]
+            },
+            {
+              "name": "CommandLine",
+              "type": "set",
+              "values": [".*delete.*shadows.*"]
+            }
+          ],
+          "mitre_attack_tactic": "Defense Evasion",
+          "mitre_attack_technique": "T1490"
+        },
+
+        {
+          "name": "WMIC Shadow Copy Delete",
+          "description": "WMIC used to delete shadow copies",
+          "severity": "Critical",
+          "action": "kill_process",
+          "ruletype_name": "Process Creation",
+          "field_values": [
+            {
+              "name": "ImageFilename",
+              "type": "set",
+              "values": [".*\\\\wmic\\.exe"]
+            },
+            {
+              "name": "CommandLine",
+              "type": "set",
+              "values": [".*shadowcopy.*delete.*"]
+            }
+          ],
+          "mitre_attack_tactic": "Defense Evasion",
+          "mitre_attack_technique": "T1490"
+        },
+
+        {
+          "name": "BCDEdit Recovery Disabled",
+          "description": "BCDEdit disabling Windows recovery — ransomware preparation",
+          "severity": "High",
+          "action": "kill_process",
+          "ruletype_name": "Process Creation",
+          "field_values": [
+            {
+              "name": "ImageFilename",
+              "type": "set",
+              "values": [".*\\\\bcdedit\\.exe"]
+            },
+            {
+              "name": "CommandLine",
+              "type": "set",
+              "values": [".*(recoveryenabled.*no|bootstatuspolicy.*ignoreallfailures).*"]
+            }
+          ],
+          "mitre_attack_tactic": "Defense Evasion",
+          "mitre_attack_technique": "T1490"
+        },
+
+        {
+          "name": "Wbadmin Backup Catalog Delete",
+          "description": "Windows Backup catalog deletion — ransomware destroying backups",
+          "severity": "Critical",
+          "action": "kill_process",
+          "ruletype_name": "Process Creation",
+          "field_values": [
+            {
+              "name": "ImageFilename",
+              "type": "set",
+              "values": [".*\\\\wbadmin\\.exe"]
+            },
+            {
+              "name": "CommandLine",
+              "type": "set",
+              "values": [".*delete.*catalog.*"]
+            }
+          ],
+          "mitre_attack_tactic": "Defense Evasion",
+          "mitre_attack_technique": "T1490"
+        }
+      ]
+    },
+
+    {
+      "name": "DRRA - Ransomware Credential Theft",
+      "description": "Pre-ransomware credential harvesting: LSASS access, mimikatz patterns",
+      "platform": "Windows",
+      "enabled": true,
+      "rules": [
+
+        {
+          "name": "LSASS Memory Access via Uncommon Process",
+          "description": "Non-system process accessing LSASS memory",
+          "severity": "Critical",
+          "action": "kill_process",
+          "ruletype_name": "Synthetic Process Creation",
+          "field_values": [
+            {
+              "name": "ImageFilename",
+              "type": "set",
+              "values": ["(?!.*\\\\(lsass|csrss|werfault|wmiprvse|taskmgr|procexp).*\\.exe$).*\\.exe$"]
+            },
+            {
+              "name": "TargetCommandLine",
+              "type": "set",
+              "values": [".*lsass.*"]
+            }
+          ],
+          "mitre_attack_tactic": "Credential Access",
+          "mitre_attack_technique": "T1003.001"
+        },
+
+        {
+          "name": "Mimikatz Command Patterns",
+          "description": "Mimikatz keywords in process command lines",
+          "severity": "Critical",
+          "action": "kill_process",
+          "ruletype_name": "Process Creation",
+          "field_values": [
+            {
+              "name": "CommandLine",
+              "type": "set",
+              "values": [".*(sekurlsa|logonpasswords|privilege::debug|lsadump::sam|kerberos::golden).*"]
+            }
+          ],
+          "mitre_attack_tactic": "Credential Access",
+          "mitre_attack_technique": "T1003"
+        }
+      ]
+    },
+
+    {
+      "name": "DRRA - Ransomware Lateral Movement",
+      "description": "PsExec, remote service installation, and WMI remote execution",
+      "platform": "Windows",
+      "enabled": true,
+      "rules": [
+
+        {
+          "name": "PsExec Remote Execution",
+          "description": "PsExec used for lateral movement to remote hosts",
+          "severity": "High",
+          "action": "detect",
+          "ruletype_name": "Process Creation",
+          "field_values": [
+            {
+              "name": "ImageFilename",
+              "type": "set",
+              "values": [".*\\\\(psexec|psexesvc)\\.exe"]
+            }
+          ],
+          "mitre_attack_tactic": "Lateral Movement",
+          "mitre_attack_technique": "T1021.002"
+        },
+
+        {
+          "name": "Suspicious Remote Service Creation",
+          "description": "SC.exe creating remote services (lateral movement via service install)",
+          "severity": "High",
+          "action": "detect",
+          "ruletype_name": "Process Creation",
+          "field_values": [
+            {
+              "name": "ImageFilename",
+              "type": "set",
+              "values": [".*\\\\sc\\.exe"]
+            },
+            {
+              "name": "CommandLine",
+              "type": "set",
+              "values": [".*\\\\\\\\.*create.*binpath.*"]
+            }
+          ],
+          "mitre_attack_tactic": "Lateral Movement",
+          "mitre_attack_technique": "T1021.002"
+        }
+      ]
+    }
+  ]
+}

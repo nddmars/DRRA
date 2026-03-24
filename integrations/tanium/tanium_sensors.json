@@ -1,0 +1,73 @@
+{
+  "comment": "DRRA Custom Tanium Sensors",
+  "description": "Import these sensors into Tanium via Content → Import. They extend Tanium's native visibility for ransomware-specific data collection.",
+
+  "sensors": [
+
+    {
+      "name": "DRRA - File Write Entropy Score",
+      "description": "Calculates Shannon entropy of recently written files. Returns files with entropy above 0.85 (encryption indicator). Run against all endpoints every 5 minutes.",
+      "category": "DRRA Security",
+      "platforms": ["Windows"],
+      "script_type": "PowerShell",
+      "script": "# DRRA Shannon Entropy Sensor\n# Returns files written in the last 60 seconds with entropy > 0.85\n\nfunction Get-FileEntropy {\n    param([string]$FilePath)\n    try {\n        $bytes = [System.IO.File]::ReadAllBytes($FilePath)\n        if ($bytes.Length -lt 256) { return 0.0 }\n        $freqs = @{}\n        foreach ($b in $bytes) { $freqs[$b] = $freqs[$b] + 1 }\n        $entropy = 0.0\n        foreach ($count in $freqs.Values) {\n            $p = $count / $bytes.Length\n            if ($p -gt 0) { $entropy -= $p * [Math]::Log($p, 2) }\n        }\n        return [Math]::Round($entropy / 8, 4)\n    } catch { return -1 }\n}\n\n$threshold = 0.85\n$lookback  = (Get-Date).AddSeconds(-60)\n$watched   = @('C:\\Users', 'C:\\ProgramData', 'D:\\')\n\n$results = @()\nforeach ($root in $watched) {\n    if (-not (Test-Path $root)) { continue }\n    $files = Get-ChildItem -Path $root -Recurse -File -ErrorAction SilentlyContinue |\n             Where-Object { $_.LastWriteTime -gt $lookback -and $_.Length -gt 1024 }\n    foreach ($file in $files) {\n        $e = Get-FileEntropy -FilePath $file.FullName\n        if ($e -gt $threshold) {\n            $results += \"$($file.FullName)|$e|$($file.LastWriteTime)\"\n        }\n    }\n}\n\nif ($results.Count -eq 0) { 'No high-entropy writes detected' } else { $results -join \"`n\" }",
+      "result_type": "String",
+      "category_tags": ["ransomware", "entropy", "T1486"]
+    },
+
+    {
+      "name": "DRRA - Ransomware Extension Count",
+      "description": "Counts files with known ransomware extensions in user directories. Nonzero result indicates active or completed encryption.",
+      "category": "DRRA Security",
+      "platforms": ["Windows"],
+      "script_type": "PowerShell",
+      "script": "$extensions = @('.locked','.enc','.encrypted','.crypto','.crypt','.ryk','.RYK','.conti','.hive','.lockbit','.blackcat','.royal','.ALPHV')\n$roots = @('C:\\Users', 'D:\\')\n$count = 0\n$found = @()\n\nforeach ($root in $roots) {\n    if (-not (Test-Path $root)) { continue }\n    foreach ($ext in $extensions) {\n        $files = Get-ChildItem -Path $root -Recurse -Filter \"*$ext\" -ErrorAction SilentlyContinue\n        $count += $files.Count\n        if ($files.Count -gt 0) { $found += \"$ext`:$($files.Count)\" }\n    }\n}\n\nif ($count -eq 0) { '0' } else { \"$count|$($found -join ',')|ALERT\" }",
+      "result_type": "String",
+      "category_tags": ["ransomware", "encrypted-files", "T1486"]
+    },
+
+    {
+      "name": "DRRA - Shadow Copy Count",
+      "description": "Returns the number of Volume Shadow Copies available. Zero copies indicates VSS deletion has occurred.",
+      "category": "DRRA Security",
+      "platforms": ["Windows"],
+      "script_type": "PowerShell",
+      "script": "$copies = Get-WmiObject -Class Win32_ShadowCopy -ErrorAction SilentlyContinue\n$count = if ($copies) { @($copies).Count } else { 0 }\nif ($count -eq 0) { \"0|CRITICAL: No shadow copies - recovery blocked\" } else { $count.ToString() }",
+      "result_type": "NumericInteger",
+      "category_tags": ["ransomware", "vss", "T1490"]
+    },
+
+    {
+      "name": "DRRA - Ransom Note Presence",
+      "description": "Checks for ransom note filenames in common user directories.",
+      "category": "DRRA Security",
+      "platforms": ["Windows"],
+      "script_type": "PowerShell",
+      "script": "$patterns = @('HOW_TO_DECRYPT*','DECRYPT_FILES*','README.TXT','RECOVERY_INSTRUCTIONS*','YOUR_FILES*','HOW_TO_RESTORE*','!!! IMPORTANT !!!')\n$roots = @('C:\\Users', 'C:\\ProgramData', 'C:\\')\n$found = @()\n\nforeach ($root in $roots) {\n    foreach ($pattern in $patterns) {\n        $files = Get-ChildItem -Path $root -Recurse -Filter $pattern -ErrorAction SilentlyContinue -Depth 5\n        foreach ($f in $files) { $found += $f.FullName }\n    }\n}\n\nif ($found.Count -eq 0) { 'No ransom notes found' } else { ($found | Select-Object -First 5) -join '|' }",
+      "result_type": "String",
+      "category_tags": ["ransomware", "ransom-note", "T1486"]
+    },
+
+    {
+      "name": "DRRA - Suspicious Outbound Connections",
+      "description": "Lists active outbound TCP connections to uncommon ports (potential C2 beaconing).",
+      "category": "DRRA Security",
+      "platforms": ["Windows"],
+      "script_type": "PowerShell",
+      "script": "$common_ports = @(80, 443, 53, 8080, 8443, 25, 587, 993, 995)\n$suspicious = @()\n\n$connections = Get-NetTCPConnection -State Established -ErrorAction SilentlyContinue |\n    Where-Object { $_.RemoteAddress -notmatch '^(10\\.|172\\.(1[6-9]|2[0-9]|3[01])\\.|192\\.168\\.|127\\.|::1)' }\n\nforeach ($conn in $connections) {\n    if ($conn.RemotePort -notin $common_ports) {\n        $proc = Get-Process -Id $conn.OwningProcess -ErrorAction SilentlyContinue\n        $suspicious += \"$($conn.RemoteAddress):$($conn.RemotePort)|$($proc.Name)|PID:$($conn.OwningProcess)\"\n    }\n}\n\nif ($suspicious.Count -eq 0) { 'No suspicious outbound connections' } else { $suspicious -join \"`n\" }",
+      "result_type": "String",
+      "category_tags": ["ransomware", "c2", "T1071"]
+    },
+
+    {
+      "name": "DRRA - Backup Service Status",
+      "description": "Checks status of Windows Backup and VSS services. Disabled services may indicate ransomware tampering.",
+      "category": "DRRA Security",
+      "platforms": ["Windows"],
+      "script_type": "PowerShell",
+      "script": "$services = @('VSS', 'wbengine', 'SDRSVC', 'swprv')\n$results = @()\n\nforeach ($svc in $services) {\n    $s = Get-Service -Name $svc -ErrorAction SilentlyContinue\n    if ($s) {\n        $status = if ($s.Status -eq 'Running') { 'OK' } else { \"ALERT:$($s.Status)\" }\n        $results += \"$svc|$($s.Status)|$($s.StartType)|$status\"\n    } else {\n        $results += \"$svc|NOT_FOUND|N/A|WARNING\"\n    }\n}\n$results -join \"`n\"",
+      "result_type": "String",
+      "category_tags": ["ransomware", "vss", "backup", "T1490"]
+    }
+  ]
+}
