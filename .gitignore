@@ -103,5 +103,5 @@ node_modules/
 dist/
 *.tsbuildinfo
 
-# Claude Code internal files
+# Internal tooling files
 .claude/
