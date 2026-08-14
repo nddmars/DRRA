@@ -41,6 +41,7 @@ jobs:
     - name: Reproduce experiment metrics (smoke)
       run: |
         python scripts/run_experiment.py --reps 5 --out results/ci_experiment.json
+        python scripts/run_feedback_experiment.py --cycles 5 --out results/ci_feedback.json
     
     - name: Upload coverage
       uses: codecov/codecov-action@v3
