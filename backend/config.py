@@ -57,6 +57,10 @@ class Settings(BaseSettings):
     VIGIL_DECISION_THRESHOLD: float = 0.85  # theta
     VIGIL_CONTAMINATION: float = 0.02
 
+    # SHIELD containment
+    SHIELD_CONTAINMENT_PROVIDER: str = os.getenv("SHIELD_CONTAINMENT_PROVIDER", "simulation")  # simulation|crowdstrike
+    SHIELD_SIM_SPEED: float = float(os.getenv("SHIELD_SIM_SPEED", "0"))  # 0 = instant (report modelled MTTC)
+
     # Defensibility Index calibration (canonical mapping; see services/defensibility.py)
     DI_MAX_SCORE: int = 100
     DI_WEIGHT_DETECTION: float = 0.30     # alpha  — MTTD efficiency

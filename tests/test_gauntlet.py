@@ -96,7 +96,10 @@ class TestShield:
             }
         )
         assert response.status_code == 200
-        assert response.json()["status"] == "in_progress"
+        # Containment now runs synchronously and reports its measured outcome.
+        body = response.json()
+        assert body["status"] == "contained"
+        assert body["estimated_isolation_time"] <= 90  # within SHIELD SLA
     
     async def test_object_lock_activation(self, client: AsyncClient):
         """Test activating object lock on storage."""

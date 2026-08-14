@@ -14,40 +14,63 @@ from models.schemas import (
 from datetime import datetime
 import uuid
 
+from config import settings
+from services.containment import ContainmentOrchestrator, build_adapter
+
 router = APIRouter()
 
 # In-memory storage (replace with database in production)
 isolation_records = {}
 recovery_tasks = {}
 
+# Containment orchestrator with the configured provider (default: simulation).
+_orchestrator = ContainmentOrchestrator(
+    build_adapter(settings.SHIELD_CONTAINMENT_PROVIDER, sim_speed=settings.SHIELD_SIM_SPEED)
+)
+
 @router.post("/isolate", response_model=IsolationResponse)
 async def isolate_resource(request: IsolationRequest):
     """
-    Immediately isolate affected resources via micro-segmentation.
-    
-    Actions:
-    - **vlan_isolate**: Isolate to quarantine VLAN
-    - **network_quarantine**: Block all network traffic
-    - **process_kill**: Terminate suspicious processes
-    - **file_lock**: Lock affected files via object locking
+    Immediately isolate affected resources via automated containment.
+
+    Runs EDR isolation, firewall quarantine, and a forensic snapshot
+    concurrently (asyncio.gather) through the configured provider, measures the
+    Mean Time to Contain, and enforces the 90-second SLA.
     """
     isolation_id = str(uuid.uuid4())
-    
+    result = await _orchestrator.contain(request.resource_id, reason=request.reason)
+
     isolation_records[isolation_id] = {
         "id": isolation_id,
         "resource_id": request.resource_id,
         "action": request.action,
-        "status": "in_progress",
-        "timestamp": datetime.utcnow()
+        "status": "contained" if result.success else "failed",
+        "mttc_seconds": result.mttc_seconds,
+        "sla_met": result.sla_met,
+        "provider": result.provider,
+        "actions": [a.__dict__ for a in result.actions],
+        "timestamp": datetime.utcnow(),
     }
-    
+
     return IsolationResponse(
         isolation_id=isolation_id,
-        status="in_progress",
+        status="contained" if result.success else "failed",
         action=request.action,
         resources_affected=1,
-        estimated_isolation_time=2.5
+        estimated_isolation_time=result.mttc_seconds,
     )
+
+
+@router.get("/containment/provider")
+async def get_containment_provider():
+    """Report the active containment provider and SLA."""
+    return {
+        "provider": settings.SHIELD_CONTAINMENT_PROVIDER,
+        "sla_seconds": 90,
+        "actions": ["edr_isolation", "firewall_quarantine", "forensic_snapshot"],
+        "note": "Set SHIELD_CONTAINMENT_PROVIDER=crowdstrike with FalconPy credentials "
+                "to execute real EDR containment.",
+    }
 
 @router.get("/isolate/{isolation_id}")
 async def get_isolation_status(isolation_id: str):
@@ -56,14 +79,17 @@ async def get_isolation_status(isolation_id: str):
         raise HTTPException(status_code=404, detail="Isolation record not found")
     
     record = isolation_records[isolation_id]
-    
+
     return {
         "isolation_id": isolation_id,
-        "status": "completed",
+        "status": record.get("status", "completed"),
         "action": record["action"],
         "resource_id": record["resource_id"],
-        "duration_seconds": 2.5,
-        "completion_time": datetime.utcnow().isoformat()
+        "mttc_seconds": record.get("mttc_seconds"),
+        "sla_met": record.get("sla_met"),
+        "provider": record.get("provider"),
+        "actions": record.get("actions", []),
+        "completion_time": datetime.utcnow().isoformat(),
     }
 
 @router.post("/object-lock/activate")
