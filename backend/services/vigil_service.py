@@ -24,7 +24,9 @@ try:
     _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
     if _REPO_ROOT not in sys.path:
         sys.path.insert(0, _REPO_ROOT)
-    from vigil.ml_model import VigilAnomalyModel, IoBVector, load_or_train_default
+    from vigil.ml_model import (
+        VigilAnomalyModel, IoBVector, load_or_train_default, load_or_train_ensemble,
+    )
     _ML_IMPORTABLE = True
 except Exception as _exc:  # pragma: no cover
     logger.warning("VIGIL ML model import failed (%s); IoB scoring disabled", _exc)
@@ -140,20 +142,22 @@ class VigilService:
     def __init__(self):
         self.detection_events = {}  # In-memory cache; PostgreSQL is source of truth
         self.pattern_detector = BehaviorPatternDetector()
-        # Real IsolationForest behavioural model (trained on a benign baseline).
+        # Two-stage ensemble: IsolationForest (stage 1) + supervised classifier
+        # (stage 2). An alert requires both stages to agree, suppressing false
+        # positives on legitimate high-volume file operations.
         self.model = None
         if _ML_IMPORTABLE:
             try:
-                self.model = load_or_train_default()
-                logger.info("VIGIL anomaly model ready (backend=%s)", self.model.backend)
+                self.model = load_or_train_ensemble()
+                logger.info("VIGIL two-stage detector ready (backend=%s)", self.model.backend)
             except Exception as exc:  # pragma: no cover
                 logger.error("Failed to initialise VIGIL model: %s", exc)
 
     def score_iob(self, features: Dict[str, float]) -> Dict[str, Any]:
         """
-        Score an Indicator-of-Behaviour feature vector with the IsolationForest
-        model. Returns the anomaly score, decision, contributing features, and
-        the MITRE ATT&CK techniques the triggering signals map to.
+        Score an Indicator-of-Behaviour feature vector with the two-stage
+        ensemble. Returns the stage-1 anomaly score, stage-2 confirmation, the
+        final decision, contributing features, and MITRE ATT&CK mappings.
         """
         if not self.model:
             return {"status": "model_unavailable", "anomaly_score": 0.0, "is_anomaly": False}
@@ -166,7 +170,7 @@ class VigilService:
             "privilege_escalation": "T1548 (Abuse Elevation Control)",
             "shadow_copy_deletion_rate": "T1490 (Inhibit System Recovery)",
         }
-        return {
+        result = {
             "status": "scored",
             "anomaly_score": detection.anomaly_score,
             "is_anomaly": detection.is_anomaly,
@@ -177,6 +181,14 @@ class VigilService:
                 attack_map[f] for f in detection.contributing_features if f in attack_map
             ],
         }
+        # Surface the two-stage breakdown when the ensemble is active.
+        if hasattr(detection, "secondary_confidence"):
+            result.update(
+                stage1_anomaly=detection.primary_flag,
+                stage2_confirmed=detection.secondary_flag,
+                secondary_confidence=detection.secondary_confidence,
+            )
+        return result
 
     async def record_detection_event(
         self,

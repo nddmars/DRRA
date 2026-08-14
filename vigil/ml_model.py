@@ -277,3 +277,165 @@ def _synthetic_benign_baseline(n: int = 2000) -> List[List[float]]:
             [random.gammavariate(2.0, 0.4), random.gammavariate(1.5, 0.3), float(random.random() < 0.2), 0.0]
             for _ in range(n)
         ]
+
+
+def _synthetic_ransomware_positives(n: int = 1000) -> List[List[float]]:
+    """
+    Generate labelled ransomware-positive IoB vectors (high rename/privesc/VSS
+    activity). Used to train the supervised secondary classifier. Deterministic.
+    """
+    try:
+        import numpy as np
+
+        rng = np.random.default_rng(11)
+        rename = rng.gamma(shape=6.0, scale=3.0, size=n)          # mass renames
+        lateral = rng.gamma(shape=3.0, scale=1.5, size=n)
+        priv = rng.poisson(lam=3.5, size=n).astype(float)
+        vss = rng.gamma(shape=2.0, scale=1.2, size=n)             # shadow-copy deletion
+        return np.stack([rename, lateral, priv, vss], axis=1).tolist()
+    except Exception:  # pragma: no cover
+        import random
+
+        random.seed(11)
+        return [
+            [random.gammavariate(6.0, 3.0), random.gammavariate(3.0, 1.5),
+             float(random.randint(1, 6)), random.gammavariate(2.0, 1.2)]
+            for _ in range(n)
+        ]
+
+
+class SecondaryClassifier:
+    """
+    Supervised secondary classifier for ensemble validation of anomalies
+    (paper Algorithm 1, step 5). Distinguishes true ransomware behaviour from
+    benign high-volume operations (e.g. batch file processing) that the
+    unsupervised IsolationForest may flag, reducing the false-positive rate.
+
+    Backend preference: TensorFlow/Keras MLP -> scikit-learn MLPClassifier ->
+    logistic-regression heuristic. The chosen backend is exposed as
+    ``self.backend`` so callers can report which stage-2 model is active.
+    """
+
+    def __init__(self, threshold: float = 0.5) -> None:
+        self.threshold = threshold
+        self._model = None
+        self._scaler = None
+        self.backend = "unfitted"
+
+    def train(self, benign: Sequence[Sequence[float]], ransomware: Sequence[Sequence[float]]):
+        X = [list(map(float, r)) for r in benign] + [list(map(float, r)) for r in ransomware]
+        y = [0] * len(benign) + [1] * len(ransomware)
+        try:
+            import numpy as np
+            from sklearn.preprocessing import StandardScaler
+
+            self._scaler = StandardScaler().fit(np.asarray(X, dtype=float))
+            Xs = self._scaler.transform(np.asarray(X, dtype=float))
+            ys = np.asarray(y)
+            if self._train_tensorflow(Xs, ys):
+                self.backend = "tensorflow_mlp"
+            else:
+                from sklearn.neural_network import MLPClassifier
+
+                self._model = MLPClassifier(hidden_layer_sizes=(16, 8), max_iter=400,
+                                            random_state=17).fit(Xs, ys)
+                self.backend = "sklearn_mlp"
+        except Exception as exc:  # pragma: no cover
+            logger.warning("secondary classifier training failed (%s); using logistic heuristic", exc)
+            self._fit_logistic(X, y)
+        return self
+
+    def _train_tensorflow(self, Xs, ys) -> bool:
+        try:
+            import tensorflow as tf  # noqa: F401
+            from tensorflow import keras
+
+            model = keras.Sequential([
+                keras.layers.Input(shape=(len(FEATURES),)),
+                keras.layers.Dense(16, activation="relu"),
+                keras.layers.Dense(8, activation="relu"),
+                keras.layers.Dense(1, activation="sigmoid"),
+            ])
+            model.compile(optimizer="adam", loss="binary_crossentropy")
+            model.fit(Xs, ys, epochs=15, batch_size=32, verbose=0)
+            self._model = model
+            self._is_keras = True
+            return True
+        except Exception:
+            return False
+
+    def _fit_logistic(self, X, y):
+        # Minimal logistic fallback: threshold on rename+vss dominant signal.
+        self._model = None
+        self.backend = "logistic_heuristic"
+
+    def predict_proba(self, vec: Sequence[float]) -> float:
+        v = list(map(float, vec))
+        if self.backend == "logistic_heuristic":
+            # Higher rename + shadow-copy deletion => ransomware-like.
+            score = (v[0] / 20.0) * 0.5 + (v[3] / 4.0) * 0.4 + (v[2] / 6.0) * 0.1
+            return max(0.0, min(1.0, score))
+        import numpy as np
+
+        Xs = self._scaler.transform(np.asarray([v], dtype=float))
+        if getattr(self, "_is_keras", False):
+            return float(self._model.predict(Xs, verbose=0)[0][0])
+        return float(self._model.predict_proba(Xs)[0][1])
+
+    def is_ransomware(self, vec: Sequence[float]) -> bool:
+        return self.predict_proba(vec) >= self.threshold
+
+
+@dataclass
+class EnsembleDetection:
+    anomaly_score: float
+    secondary_confidence: float
+    is_anomaly: bool               # final decision: primary AND secondary agree
+    primary_flag: bool
+    secondary_flag: bool
+    threshold: float
+    contributing_features: List[str]
+    backend: str                   # "isolation_forest+<secondary>"
+
+
+class TwoStageDetector:
+    """
+    VIGIL's two-stage ensemble: IsolationForest anomaly gate (stage 1) followed
+    by a supervised classifier that confirms ransomware behaviour (stage 2).
+    A CRITICAL alert fires only when both stages agree, which suppresses false
+    positives on legitimate high-volume file operations.
+    """
+
+    def __init__(self, primary: VigilAnomalyModel, secondary: SecondaryClassifier) -> None:
+        self.primary = primary
+        self.secondary = secondary
+        self.threshold = primary.threshold
+        self.contamination = primary.contamination
+        self.backend = f"{primary.backend}+{secondary.backend}"
+
+    def score(self, features) -> EnsembleDetection:
+        base = self.primary.score(features)
+        vec = features.as_list() if isinstance(features, IoBVector) else list(map(float, features))
+        secondary_conf = self.secondary.predict_proba(vec)
+        secondary_flag = secondary_conf >= self.secondary.threshold
+        primary_flag = base.is_anomaly
+        return EnsembleDetection(
+            anomaly_score=base.anomaly_score,
+            secondary_confidence=round(secondary_conf, 4),
+            is_anomaly=primary_flag and secondary_flag,
+            primary_flag=primary_flag,
+            secondary_flag=secondary_flag,
+            threshold=base.threshold,
+            contributing_features=base.contributing_features,
+            backend=self.backend,
+        )
+
+
+def load_or_train_ensemble() -> TwoStageDetector:
+    """Return a ready two-stage detector (primary + secondary), training both on
+    synthetic baselines if no persisted model is available."""
+    primary = load_or_train_default()
+    secondary = SecondaryClassifier().train(
+        _synthetic_benign_baseline(), _synthetic_ransomware_positives()
+    )
+    return TwoStageDetector(primary, secondary)

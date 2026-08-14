@@ -94,11 +94,15 @@ fidelity. The dashboard endpoints compute the DI, MTTC, FPR and APCR from
 **recorded incident measurements** (`services/metrics_store.py`), not from
 hard-coded values. With no incidents recorded the API returns honest zeros.
 
-**Real behavioural detection.** VIGIL uses a scikit-learn `IsolationForest`
-(`vigil/ml_model.py`, `contamination=0.02`, `n_estimators=200`) trained on a
-benign baseline, exposed at `POST /api/v1/vigil/score`. If scikit-learn is
-unavailable it degrades to a robust z-score detector so the pipeline always has
-a scorer.
+**Real behavioural detection (two-stage ensemble).** VIGIL uses a
+scikit-learn `IsolationForest` anomaly gate (`vigil/ml_model.py`,
+`contamination=0.02`, `n_estimators=200`) followed by a **supervised secondary
+classifier** that confirms ransomware behaviour (paper Algorithm 1, step 5). A
+CRITICAL alert fires only when **both stages agree**, suppressing false
+positives on legitimate high-volume file operations. The secondary uses
+TensorFlow/Keras when available and falls back to a scikit-learn MLP, then a
+logistic heuristic. Exposed at `POST /api/v1/vigil/score`, which returns the
+stage-1 anomaly score, the stage-2 confirmation, and MITRE ATT&CK mappings.
 
 **Reproduce the simulation results** (paper Table 4) end-to-end:
 

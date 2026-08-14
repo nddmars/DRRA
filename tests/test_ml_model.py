@@ -6,8 +6,12 @@ from vigil.ml_model import (
     FEATURES,
     IoBVector,
     VigilAnomalyModel,
+    SecondaryClassifier,
+    TwoStageDetector,
     load_or_train_default,
+    load_or_train_ensemble,
     _synthetic_benign_baseline,
+    _synthetic_ransomware_positives,
 )
 
 
@@ -59,3 +63,43 @@ def test_synthetic_baseline_shape():
     base = _synthetic_benign_baseline(50)
     assert len(base) == 50
     assert all(len(row) == len(FEATURES) for row in base)
+
+
+# ---- two-stage ensemble ----------------------------------------------------
+
+@pytest.fixture(scope="module")
+def ensemble():
+    return load_or_train_ensemble()
+
+
+def test_secondary_classifier_separates_classes():
+    clf = SecondaryClassifier().train(
+        _synthetic_benign_baseline(400), _synthetic_ransomware_positives(400)
+    )
+    assert clf.backend in ("tensorflow_mlp", "sklearn_mlp", "logistic_heuristic")
+    benign = clf.predict_proba([0.5, 0.3, 0.0, 0.0])
+    ransom = clf.predict_proba([25.0, 7.0, 6.0, 4.0])
+    assert ransom > benign
+
+
+def test_ensemble_flags_ransomware(ensemble):
+    d = ensemble.score(IoBVector(25.0, 7.0, 6.0, 4.0))
+    assert d.primary_flag is True
+    assert d.secondary_flag is True
+    assert d.is_anomaly is True
+    assert "+" in d.backend  # e.g. isolation_forest+sklearn_mlp
+
+
+def test_ensemble_suppresses_benign(ensemble):
+    d = ensemble.score(IoBVector(0.5, 0.3, 0.0, 0.0))
+    assert d.is_anomaly is False
+
+
+def test_ensemble_requires_both_stages(ensemble):
+    """Final decision is the AND of stage 1 and stage 2."""
+    d = ensemble.score(IoBVector(25.0, 7.0, 6.0, 4.0))
+    assert d.is_anomaly == (d.primary_flag and d.secondary_flag)
+
+
+def test_ensemble_type(ensemble):
+    assert isinstance(ensemble, TwoStageDetector)
