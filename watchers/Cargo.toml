@@ -3,6 +3,10 @@ name = "resilience-watcher"
 version = "0.1.0"
 edition = "2021"
 
+[lib]
+name = "resilience_watcher"
+path = "src/lib.rs"
+
 [[bin]]
 name = "watcher"
 path = "src/main.rs"

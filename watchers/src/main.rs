@@ -1,7 +1,5 @@
-mod lib;
-
-use lib::{FileSystemWatcher, WatcherConfig};
-use tracing::{info, error};
+use resilience_watcher::{FileSystemWatcher, WatcherConfig};
+use tracing::{error, info};
 
 #[tokio::main]
 async fn main() {

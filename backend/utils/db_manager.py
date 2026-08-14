@@ -3,7 +3,7 @@ Database utilities for persisting events and incidents to PostgreSQL.
 """
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Optional, List
 from db.session import SessionLocal
 from db.models import (
@@ -158,8 +158,8 @@ class DatabaseManager:
         """Persist immutable telemetry event."""
         try:
             db = SessionLocal()
-            retention_until = datetime.now(timezone.utc).replace(day=datetime.now(timezone.utc).day + retention_days)
-            
+            retention_until = datetime.now(timezone.utc) + timedelta(days=retention_days)
+
             telemetry = TelemetryEventModel(
                 event_id=event_id,
                 timestamp=datetime.now(timezone.utc),
@@ -192,8 +192,8 @@ class DatabaseManager:
         """Create forensic evidence record."""
         try:
             db = SessionLocal()
-            retention_until = datetime.now(timezone.utc).replace(day=datetime.now(timezone.utc).day + retention_days)
-            
+            retention_until = datetime.now(timezone.utc) + timedelta(days=retention_days)
+
             evidence = ForensicEvidenceModel(
                 evidence_id=evidence_id,
                 incident_id=incident_id,
