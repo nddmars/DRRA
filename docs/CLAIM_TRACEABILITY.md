@@ -16,6 +16,7 @@ as such wherever reported · **Future** = not yet built.
 | VIGIL scores real adversary telemetry | Partial | `vigil/ingest.py`, `scripts/run_real_data.py`; `tests/test_ingest.py`; data via `scripts/fetch_datasets.py` (DRRA-076) |
 | Defensibility Index = weighted harmonic mean of MTTD/MTTC/APCR/recovery | Implemented | `backend/services/defensibility.py`; `tests/test_defensibility.py` |
 | DI computed from recorded metrics (not literals) | Implemented | `backend/services/metrics_store.py`, `backend/routes/dashboard_router.py` |
+| DI ranking is robust, monotone, and penalizes the weakest component | Implemented | `scripts/run_di_sensitivity.py`, `tests/test_di_sensitivity.py` (DRRA-082): 100% ordering preserved under uniform-simplex weight sampling, 0 monotonicity violations, weakest-component dominance verified |
 | SHIELD concurrent containment, measured MTTC, 90 s SLA | Implemented | `backend/services/containment.py`; `tests/test_containment.py` |
 | SHIELD real EDR containment (CrowdStrike) | Partial | `CrowdStrikeAdapter` in `backend/services/containment.py` (needs live creds) |
 | GRAB immutable backups (MinIO Object Lock) | Partial | `backend/utils/minio_client.py` (Object Lock + retention); end-to-end clean-room recovery = Future (DRRA-083) |
