@@ -148,6 +148,55 @@ def run(cycles: int, seed: int = 99):
     }
 
 
+def run_leakfree(cycles: int, seed: int = 99):
+    """
+    DRRA-080 — leakage-free feedback evaluation.
+
+    A FIXED held-out benign evaluation set is generated once and NEVER used for
+    training. Each cycle's retraining uses a separate benign training batch that
+    is disjoint from the evaluation set, so a cycle's labels cannot enter its own
+    evaluation. Ensemble FPR is measured on the held-out set every cycle, giving
+    an honest convergence curve.
+    """
+    rng_eval = random.Random(f"eval-{seed}")
+    heldout = benign_batch(200, rng_eval)          # fixed, never trained on
+    heldout_pos = ransomware_batch(100, rng_eval)  # fixed positives for recall
+
+    primary = VigilAnomalyModel().train(_ml._synthetic_benign_baseline())
+    benign_train = _ml._synthetic_benign_baseline(300)
+    ransomware_train = _ml._synthetic_ransomware_positives(400)
+    secondary = SecondaryClassifier().train(benign_train, ransomware_train)
+    detector = TwoStageDetector(primary, secondary)
+
+    per_cycle = []
+    for c in range(1, cycles + 1):
+        # measure on the HELD-OUT eval set (never used for training)
+        fp = sum(1 for v in heldout if detector.score(IoBVector(*v)).is_anomaly)
+        tp = sum(1 for v in heldout_pos if detector.score(IoBVector(*v)).is_anomaly)
+        per_cycle.append({
+            "cycle": c,
+            "heldout_fpr": round(fp / len(heldout), 4),
+            "heldout_recall": round(tp / len(heldout_pos), 4),
+        })
+        # retrain on a SEPARATE training batch, disjoint from the eval set
+        rng_train = random.Random(f"train-{seed}-{c}")
+        benign_train = benign_train + benign_batch(60, rng_train)
+        secondary = SecondaryClassifier().train(benign_train, ransomware_train)
+        detector = TwoStageDetector(primary, secondary)
+
+    return {
+        "cycles": cycles,
+        "eval_is_heldout": True,
+        "n_heldout_benign": len(heldout),
+        "per_cycle": per_cycle,
+        "summary": {
+            "initial_heldout_fpr": per_cycle[0]["heldout_fpr"],
+            "final_heldout_fpr": per_cycle[-1]["heldout_fpr"],
+            "final_heldout_recall": per_cycle[-1]["heldout_recall"],
+        },
+    }
+
+
 def to_markdown(results):
     rows = ["| Cycle | Primary-only FPR | Ensemble FPR | Detection rate | DI |",
             "|---|---|---|---|---|"]
