@@ -19,7 +19,8 @@ as such wherever reported · **Future** = not yet built.
 | DI ranking is robust, monotone, and penalizes the weakest component | Implemented | `scripts/run_di_sensitivity.py`, `tests/test_di_sensitivity.py` (DRRA-082): 100% ordering preserved under uniform-simplex weight sampling, 0 monotonicity violations, weakest-component dominance verified |
 | SHIELD concurrent containment, measured MTTC, 90 s SLA | Implemented | `backend/services/containment.py`; `tests/test_containment.py` |
 | SHIELD real EDR containment (CrowdStrike) | Partial | `CrowdStrikeAdapter` in `backend/services/containment.py` (needs live creds) |
-| GRAB immutable backups (MinIO Object Lock) | Partial | `backend/utils/minio_client.py` (Object Lock + retention); end-to-end clean-room recovery = Future (DRRA-083) |
+| GRAB immutable backups (MinIO Object Lock) | Partial | `backend/utils/minio_client.py` (Object Lock + retention); live MinIO Object Lock needs a running server |
+| GRAB clean-room recovery + measured recovery fidelity | Implemented | `backend/services/grab_recovery.py`, `scripts/run_recovery_drill.py`, `tests/test_grab_recovery.py` (DRRA-083): four-stage drill (integrity/completeness/isolation/immutability) restores from a WORM store into an isolated clean room; `recovery_fidelity` fed to the DI is now measured, and the failure modes are covered by tests |
 | Table 5 measured results (30 reps, 95% CI) | Implemented (simulation) | `scripts/run_experiment.py --reps 30` → `results/paper_metrics.json` |
 | §5.5 feedback-loop / compounding resilience | Implemented (simulation) | `scripts/run_feedback_experiment.py --cycles 10` → `results/feedback.json` |
 | Figures 1–5 | Implemented | `scripts/generate_figures.py`, `scripts/generate_architecture_figure.py` |
