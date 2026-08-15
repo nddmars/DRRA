@@ -110,23 +110,27 @@ def _label_bars(ax, bars, fmt="{:.1f}"):
 
 
 def figure2():
-    res = feedback.run(cycles=10, seed=99)
+    # Leakage-free evaluation (DRRA-080): a fixed held-out set that is never
+    # trained on. FPR is measured on that set; DI is computed from the measured
+    # FPR at a fixed reference operating point (see run_leakfree).
+    res = feedback.run_leakfree(cycles=10, seed=99)
     cycles = [x["cycle"] for x in res["per_cycle"]]
-    fpr = [x["ensemble_fpr"] * 100 for x in res["per_cycle"]]
+    fpr = [x["heldout_fpr"] * 100 for x in res["per_cycle"]]
     di = [x["defensibility_index"] for x in res["per_cycle"]]
 
     fig, ax1 = plt.subplots(figsize=(7, 4))
     ax2 = ax1.twinx()
     ax2.grid(False)
     l1, = ax1.plot(cycles, di, "o-", color=C_WSG, lw=2, label="Defensibility Index")
-    l2, = ax2.plot(cycles, fpr, "s--", color=C_ACCENT, lw=2, label="Ensemble false-positive rate")
+    l2, = ax2.plot(cycles, fpr, "s--", color=C_ACCENT, lw=2, label="Held-out false-positive rate")
     ax1.set_xlabel("Incident–feedback cycle")
     ax1.set_ylabel("Defensibility Index", color=C_WSG)
-    ax2.set_ylabel("False-positive rate (%)", color=C_ACCENT)
-    ax1.set_ylim(0.6, 0.85)
-    ax2.set_ylim(-2, 55)
+    ax2.set_ylabel("Held-out false-positive rate (%)", color=C_ACCENT)
+    ax1.set_ylim(0.55, 0.9)
+    ax2.set_ylim(-2, max(55, max(fpr) + 5))
     ax1.set_xticks(cycles)
-    ax1.set_title("Figure 2. Compounding resilience across feedback cycles")
+    ax1.set_title("Figure 2. Compounding resilience across feedback cycles\n"
+                  "(leakage-free held-out evaluation)")
     ax1.legend(handles=[l1, l2], loc="center right", frameon=False)
     _save(fig, "figure2_di_across_cycles.png")
 

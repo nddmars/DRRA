@@ -174,15 +174,26 @@ def run_leakfree(cycles: int, seed: int = 99):
     secondary = SecondaryClassifier().train(benign_train, ransomware_train)
     detector = TwoStageDetector(primary, secondary)
 
+    # DI is computed from the MEASURED held-out FPR each cycle (fpr_penalty on).
+    # The other DI inputs are a fixed reference operating point — this study
+    # isolates the effect of the feedback loop on the false-positive rate, it does
+    # not re-measure detection/containment latency. These are reference values,
+    # not measurements, and are reported as such.
+    di_engine = DefensibilityIndex(fpr_penalty=True)
+    REF = {"mttd_seconds": 2.5, "mttc_seconds": 7.8, "apcr": 0.46, "recovery_fidelity": 1.0}
+
     per_cycle = []
     for c in range(1, cycles + 1):
         # measure on the HELD-OUT eval set (never used for training)
         fp = sum(1 for v in heldout if detector.score(IoBVector(*v)).is_anomaly)
         tp = sum(1 for v in heldout_pos if detector.score(IoBVector(*v)).is_anomaly)
+        heldout_fpr = fp / len(heldout)
+        di = di_engine.score(false_positive_rate=heldout_fpr, **REF).defensibility_index
         per_cycle.append({
             "cycle": c,
-            "heldout_fpr": round(fp / len(heldout), 4),
+            "heldout_fpr": round(heldout_fpr, 4),
             "heldout_recall": round(tp / len(heldout_pos), 4),
+            "defensibility_index": round(di, 4),
         })
         # retrain on a SEPARATE training batch, disjoint from the eval set
         rng_train = random.Random(f"train-{seed}-{c}")
@@ -195,13 +206,63 @@ def run_leakfree(cycles: int, seed: int = 99):
         "eval_is_heldout": True,
         "n_heldout_benign": len(heldout),
         "heldout_fingerprint": heldout_fingerprint,
+        "di_reference_operating_point": REF,
+        "di_note": "DI varies with the MEASURED held-out FPR; the other DI inputs "
+                   "are a fixed reference operating point, not measurements.",
         "per_cycle": per_cycle,
         "summary": {
             "initial_heldout_fpr": per_cycle[0]["heldout_fpr"],
             "final_heldout_fpr": per_cycle[-1]["heldout_fpr"],
             "final_heldout_recall": per_cycle[-1]["heldout_recall"],
+            "initial_di": per_cycle[0]["defensibility_index"],
+            "final_di": per_cycle[-1]["defensibility_index"],
         },
     }
+
+
+def to_markdown_leakfree(results):
+    rows = ["| Cycle | Held-out FPR | Held-out recall | DI |",
+            "|---|---|---|---|"]
+    for x in results["per_cycle"]:
+        rows.append(f"| {x['cycle']} | {x['heldout_fpr']*100:.1f}% | "
+                    f"{x['heldout_recall']*100:.1f}% | {x['defensibility_index']:.3f} |")
+    return "\n".join(rows)
+
+
+def main():
+    ap = argparse.ArgumentParser(description="WSG closed-loop feedback experiment")
+    ap.add_argument("--cycles", type=int, default=10)
+    ap.add_argument("--seed", type=int, default=99)
+    ap.add_argument("--out", type=str, default="results/feedback.json")
+    ap.add_argument("--leaky", action="store_true",
+                    help="use the legacy run() where each evaluated batch then "
+                         "enters training (has evaluation leakage; not for the "
+                         "journal/reproducibility path)")
+    args = ap.parse_args()
+
+    # DEFAULT is the leakage-free evaluation (DRRA-080): a fixed held-out set that
+    # is never trained on. --leaky selects the legacy run() only for comparison.
+    results = run(args.cycles, args.seed) if args.leaky else run_leakfree(args.cycles, args.seed)
+    out = os.path.join(_REPO, args.out) if not os.path.isabs(args.out) else args.out
+    os.makedirs(os.path.dirname(out), exist_ok=True)
+    with open(out, "w") as f:
+        json.dump(results, f, indent=2)
+
+    s = results["summary"]
+    if args.leaky:
+        print("\n## WSG Feedback-Loop (legacy, WITH evaluation leakage — comparison only)\n")
+        print(to_markdown(results))
+        print(f"\n**Ensemble FPR: {s['initial_ensemble_fpr']*100:.1f}% → "
+              f"{s['final_ensemble_fpr']*100:.1f}%.**")
+    else:
+        print("\n## WSG Feedback-Loop Validation — leakage-free (Section 5.5)\n")
+        print("_Fixed held-out eval set, never trained on. DI uses the MEASURED "
+              "held-out FPR at a fixed reference operating point._\n")
+        print(to_markdown_leakfree(results))
+        print(f"\n**Held-out FPR: {s['initial_heldout_fpr']*100:.1f}% → "
+              f"{s['final_heldout_fpr']*100:.1f}% (recall {s['final_heldout_recall']*100:.0f}%).**")
+        print(f"**Defensibility Index: {s['initial_di']:.3f} → {s['final_di']:.3f}.**")
+    print(f"\n[*] Results written to {out}", file=sys.stderr)
 
 
 def to_markdown(results):
@@ -212,30 +273,6 @@ def to_markdown(results):
                     f"{x['ensemble_fpr']*100:.1f}% | {x['detection_rate']*100:.1f}% | "
                     f"{x['defensibility_index']:.3f} |")
     return "\n".join(rows)
-
-
-def main():
-    ap = argparse.ArgumentParser(description="WSG closed-loop feedback experiment")
-    ap.add_argument("--cycles", type=int, default=10)
-    ap.add_argument("--seed", type=int, default=99)
-    ap.add_argument("--out", type=str, default="results/feedback.json")
-    args = ap.parse_args()
-
-    results = run(args.cycles, args.seed)
-    out = os.path.join(_REPO, args.out) if not os.path.isabs(args.out) else args.out
-    os.makedirs(os.path.dirname(out), exist_ok=True)
-    with open(out, "w") as f:
-        json.dump(results, f, indent=2)
-
-    s = results["summary"]
-    print("\n## WSG Feedback-Loop Validation (Section 5.5)\n")
-    print(f"_Secondary backend: {results['secondary_backend']}, {args.cycles} cycles._\n")
-    print(to_markdown(results))
-    print(f"\n**FPR reduction across {args.cycles} cycles: "
-          f"{s['initial_ensemble_fpr']*100:.1f}% → {s['final_ensemble_fpr']*100:.1f}% "
-          f"({s['fpr_reduction_pct']:.1f}% relative reduction).**")
-    print(f"**Defensibility Index: {s['initial_di']:.3f} → {s['final_di']:.3f}.**")
-    print(f"\n[*] Results written to {out}", file=sys.stderr)
 
 
 if __name__ == "__main__":
