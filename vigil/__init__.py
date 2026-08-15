@@ -1,3 +1,1 @@
-# Vigil Detection Module
-
-ML-based behavioral pattern detection for ransomware threats.
+"""VIGIL detection module — ML-based behavioural pattern detection for ransomware."""

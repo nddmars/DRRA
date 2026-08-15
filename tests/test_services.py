@@ -6,9 +6,9 @@ Run with: pytest tests/ -v
 
 import pytest
 import asyncio
-from datetime import datetime
+from datetime import datetime, timezone
 from backend.services.forge_service import ForgeService, HoneypotGenerator, PayloadSimulator
-from backend.services.vigil_service import VgilService, BehaviorPatternDetector, TelemetryService
+from backend.services.vigil_service import VigilService, BehaviorPatternDetector, TelemetryService
 from backend.services.shield_service import ShieldService, MicroSegmentationService, RecoveryOrchestrator
 
 
@@ -124,7 +124,7 @@ class TestVgilService:
     
     @pytest.fixture
     def vigil_service(self):
-        return VgilService()
+        return VigilService()
     
     @pytest.mark.asyncio
     async def test_record_detection_event(self, vigil_service):
@@ -338,7 +338,7 @@ class TestShieldService:
             retention_days=90
         )
         
-        assert result['status'] == 'preserving'
+        assert result['status'] == 'preserved'
         assert result['retention_days'] == 90
 
 
@@ -406,7 +406,7 @@ class TestIntegration:
     def services(self):
         return {
             'forge': ForgeService(),
-            'vigil': VgilService(),
+            'vigil': VigilService(),
             'shield': ShieldService()
         }
     

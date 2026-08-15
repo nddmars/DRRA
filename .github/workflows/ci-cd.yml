@@ -32,11 +32,16 @@ jobs:
     - name: Lint with flake8
       run: |
         pip install flake8
-        flake8 backend/ --count --select=E9,F63,F7,F82 --show-source --statistics
-    
+        flake8 backend/ vigil/ scripts/ --count --select=E9,F63,F7,F82 --show-source --statistics
+
     - name: Run tests
       run: |
-        pytest tests/test_services.py -v --tb=short --cov=backend --cov-report=xml
+        pytest tests/ -v --tb=short --cov=backend --cov=vigil --cov-report=xml
+
+    - name: Reproduce experiment metrics (smoke)
+      run: |
+        python scripts/run_experiment.py --reps 5 --out results/ci_experiment.json
+        python scripts/run_feedback_experiment.py --cycles 5 --out results/ci_feedback.json
     
     - name: Upload coverage
       uses: codecov/codecov-action@v3

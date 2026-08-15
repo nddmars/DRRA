@@ -16,6 +16,22 @@ from utils.kafka_publisher import kafka_publisher
 
 logger = logging.getLogger(__name__)
 
+# Real behavioural model (scikit-learn IsolationForest with heuristic fallback).
+# Imported lazily-safe: if the vigil package path is unavailable the service
+# still loads and the ML endpoints report the model as uninitialised.
+try:
+    import sys
+    _REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+    if _REPO_ROOT not in sys.path:
+        sys.path.insert(0, _REPO_ROOT)
+    from vigil.ml_model import (
+        VigilAnomalyModel, IoBVector, load_or_train_default, load_or_train_ensemble,
+    )
+    _ML_IMPORTABLE = True
+except Exception as _exc:  # pragma: no cover
+    logger.warning("VIGIL ML model import failed (%s); IoB scoring disabled", _exc)
+    _ML_IMPORTABLE = False
+
 # ML Detection Thresholds
 ENTROPY_THRESHOLD = 0.85  # High entropy indicates encryption
 MASS_MODIFICATION_THRESHOLD = 0.15  # 15% of files modified in timeframe
@@ -120,13 +136,60 @@ class BehaviorPatternDetector:
         return None
 
 
-class VgilService:
+class VigilService:
     """Service for detection and threat analysis."""
     
     def __init__(self):
-        self.detection_events = {}  # In-memory for now, replace with DB
+        self.detection_events = {}  # In-memory cache; PostgreSQL is source of truth
         self.pattern_detector = BehaviorPatternDetector()
-        
+        # Two-stage ensemble: IsolationForest (stage 1) + supervised classifier
+        # (stage 2). An alert requires both stages to agree, suppressing false
+        # positives on legitimate high-volume file operations.
+        self.model = None
+        if _ML_IMPORTABLE:
+            try:
+                self.model = load_or_train_ensemble()
+                logger.info("VIGIL two-stage detector ready (backend=%s)", self.model.backend)
+            except Exception as exc:  # pragma: no cover
+                logger.error("Failed to initialise VIGIL model: %s", exc)
+
+    def score_iob(self, features: Dict[str, float]) -> Dict[str, Any]:
+        """
+        Score an Indicator-of-Behaviour feature vector with the two-stage
+        ensemble. Returns the stage-1 anomaly score, stage-2 confirmation, the
+        final decision, contributing features, and MITRE ATT&CK mappings.
+        """
+        if not self.model:
+            return {"status": "model_unavailable", "anomaly_score": 0.0, "is_anomaly": False}
+
+        vec = IoBVector.from_mapping(features)
+        detection = self.model.score(vec)
+        attack_map = {
+            "file_rename_rate": "T1486 (Data Encrypted for Impact)",
+            "lateral_movement_score": "T1021 (Remote Services)",
+            "privilege_escalation": "T1548 (Abuse Elevation Control)",
+            "shadow_copy_deletion_rate": "T1490 (Inhibit System Recovery)",
+        }
+        result = {
+            "status": "scored",
+            "anomaly_score": detection.anomaly_score,
+            "is_anomaly": detection.is_anomaly,
+            "threshold": detection.threshold,
+            "model_backend": detection.backend,
+            "contributing_features": detection.contributing_features,
+            "attack_techniques": [
+                attack_map[f] for f in detection.contributing_features if f in attack_map
+            ],
+        }
+        # Surface the two-stage breakdown when the ensemble is active.
+        if hasattr(detection, "secondary_confidence"):
+            result.update(
+                stage1_anomaly=detection.primary_flag,
+                stage2_confirmed=detection.secondary_flag,
+                secondary_confidence=detection.secondary_confidence,
+            )
+        return result
+
     async def record_detection_event(
         self,
         threat_type: str,
@@ -387,7 +450,7 @@ class TelemetryService:
 if __name__ == "__main__":
     import asyncio
     
-    vigil = VgilService()
+    vigil = VigilService()
     telemetry = TelemetryService()
     
     # Example usage

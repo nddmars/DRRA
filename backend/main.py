@@ -30,7 +30,18 @@ logger = logging.getLogger(__name__)
 async def lifespan(app: FastAPI):
     """Application lifespan event handler."""
     logger.info("🔥 Resilience Forge starting up...")
-    
+
+    # Fail-fast configuration audit for production deployments.
+    if not settings.DEBUG:
+        problems = settings.assert_production_ready()
+        if problems:
+            for p in problems:
+                logger.warning("⚠️  INSECURE CONFIG: %s", p)
+            logger.warning(
+                "⚠️  %d insecure default(s) detected. Set real secrets before "
+                "exposing this deployment.", len(problems),
+            )
+
     # Initialize database tables
     try:
         init_db()

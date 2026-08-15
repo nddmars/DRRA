@@ -1,15 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import { LineChart, Line, AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { AlertTriangle, CheckCircle, Clock, Activity } from 'lucide-react';
 import ThreatFeed from './components/ThreatFeed';
 import DefensibilityScorecard from './components/DefensibilityScorecard';
-import IncidentTimeline from './components/IncidentTimeline';
 
 const Dashboard = () => {
   const [mttc, setMttc] = useState(0);
   const [defensibility, setDefensibility] = useState(0);
-  const [incidents, setIncidents] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [, setIsLoading] = useState(true);
 
   useEffect(() => {
     fetchDashboardData();

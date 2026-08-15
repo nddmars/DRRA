@@ -14,6 +14,8 @@ from models.schemas import (
 from datetime import datetime, timezone
 from config import settings
 from utils.db_manager import db_manager
+from services.vigil_service import VigilService
+from pydantic import BaseModel, Field
 import uuid
 import logging
 
@@ -23,6 +25,35 @@ router = APIRouter()
 
 # In-memory cache for quick access (backed by PostgreSQL for persistence)
 detected_events = {}
+
+# Behavioural model service (holds the trained IsolationForest).
+vigil_service = VigilService()
+
+
+class IoBScoreRequest(BaseModel):
+    """Indicators of Behaviour to score with the VIGIL anomaly model."""
+
+    file_rename_rate: float = Field(0.0, ge=0.0, description="renames/sec (baseline-normalised)")
+    lateral_movement_score: float = Field(0.0, ge=0.0, description="novel SMB auth rate")
+    privilege_escalation: float = Field(0.0, ge=0.0, description="token/LSASS/Kerberoast count")
+    shadow_copy_deletion_rate: float = Field(0.0, ge=0.0, description="shadow-copy deletions")
+
+
+@router.post("/score")
+async def score_iob(request: IoBScoreRequest):
+    """
+    Score a behavioural feature vector with the VIGIL IsolationForest model.
+
+    Returns the bounded anomaly score in [0, 1], whether it exceeds the decision
+    threshold theta, and the MITRE ATT&CK techniques the contributing IoB signals
+    map to. This is the real detection primitive behind the WALL pillar.
+    """
+    result = vigil_service.score_iob(request.dict())
+    return {
+        "model": "IsolationForest (VIGIL)",
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+        **result,
+    }
 
 
 @router.get("/events")

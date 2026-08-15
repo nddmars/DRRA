@@ -105,3 +105,11 @@ dist/
 
 # Internal tooling files
 .claude/
+
+# Experiment outputs
+results/
+*.joblib
+
+# Rust build artifacts
+target/
+watchers/target/

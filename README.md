@@ -84,6 +84,49 @@ drra/
 | Message Queue | Apache Kafka |
 | Frontend | React / TypeScript |
 
+## Defensibility Index & Reproducible Metrics
+
+The **Defensibility Index (DI)** is implemented once, canonically, in
+[`backend/services/defensibility.py`](backend/services/defensibility.py) as the
+weighted harmonic mean of four measured components — detection efficiency
+(MTTD), containment efficiency (MTTC), prevention (`1 − APCR`), and recovery
+fidelity. The dashboard endpoints compute the DI, MTTC, FPR and APCR from
+**recorded incident measurements** (`services/metrics_store.py`), not from
+hard-coded values. With no incidents recorded the API returns honest zeros.
+
+**Real behavioural detection (two-stage ensemble).** VIGIL uses a
+scikit-learn `IsolationForest` anomaly gate (`vigil/ml_model.py`,
+`contamination=0.02`, `n_estimators=200`) followed by a **supervised secondary
+classifier** that confirms ransomware behaviour (paper Algorithm 1, step 5). A
+CRITICAL alert fires only when **both stages agree**, suppressing false
+positives on legitimate high-volume file operations. The secondary uses
+TensorFlow/Keras when available and falls back to a scikit-learn MLP, then a
+logistic heuristic. Exposed at `POST /api/v1/vigil/score`, which returns the
+stage-1 anomaly score, the stage-2 confirmation, and MITRE ATT&CK mappings.
+
+**Reproduce the simulation results** (paper Table 4) end-to-end:
+
+```bash
+python scripts/run_experiment.py --reps 10 --out results/experiment.json
+```
+
+This replays two multi-stage adversarial scenarios (Change Healthcare / MOVEit)
+through the real model and DI engine and prints a Markdown table with
+mean ± 95% CI for MTTD, MTTC, FPR, APCR, recovery fidelity, and DI. Nothing is
+hard-coded — MTTD and APCR emerge from the model actually scoring each
+kill-chain stage.
+
+## Testing
+
+```bash
+pip install -r requirements.txt
+pytest tests/                 # Python: DI engine, ML model, services, API gauntlet
+cd watchers && cargo test     # Rust file-system watcher
+```
+
+Tests that need the live stack (PostgreSQL/Kafka/MinIO) skip automatically when
+those services are not reachable; the core logic is fully covered offline.
+
 ## License
 
 MIT License — See LICENSE file for details.

@@ -1,289 +1,254 @@
 """
-Route handler for The Dashboard (monitoring and control).
-FR-4: MTTC Tracker, Defensibility Index, Configuration Studio
+Dashboard routes — MTTC tracker, Defensibility Index, configuration.
+
+All operational numbers here are derived from ``metrics_store`` (what the system
+actually measured) via the canonical Defensibility Index engine. When no
+incidents have been recorded yet the endpoints return honest zeros rather than
+fabricated demo values.
 """
 
+from datetime import datetime, timezone
+
 from fastapi import APIRouter
+from pydantic import BaseModel, Field
+
+from config import settings
 from models.schemas import (
     DefensibilityIndex,
     IncidentMetrics,
     SystemHealth,
     DashboardSummary,
     DetectionEvent,
-    ThreatLevel
+    ThreatLevel,
 )
-from datetime import datetime
-import random
+from services.defensibility import IncidentRecord
+from services.metrics_store import metrics_store
 
 router = APIRouter()
 
+
+class IncidentOutcomeRequest(BaseModel):
+    """A closed incident's measured outcome, reported by SHIELD/GRAB.
+
+    Recording an outcome here is what feeds the Defensibility Index — these are
+    measurements from a real (or replayed) incident, not display values.
+    """
+
+    incident_id: str
+    detected: bool = True
+    true_positive: bool = True
+    mttd_seconds: float = Field(0.0, ge=0.0)
+    mttc_seconds: float = Field(0.0, ge=0.0)
+    apcr: float = Field(0.0, ge=0.0, le=1.0)
+    recovery_fidelity: float = Field(1.0, ge=0.0, le=1.0)
+    immutability_intact: bool = True
+    scenario: str = ""
+
+
+@router.post("/incidents")
+async def record_incident(outcome: IncidentOutcomeRequest):
+    """Record a closed incident's outcome into the Defensibility Index engine."""
+    metrics_store.record_incident(
+        IncidentRecord(
+            incident_id=outcome.incident_id,
+            detected=outcome.detected,
+            true_positive=outcome.true_positive,
+            mttd_seconds=outcome.mttd_seconds,
+            mttc_seconds=outcome.mttc_seconds,
+            apcr=outcome.apcr,
+            recovery_fidelity=outcome.recovery_fidelity,
+            immutability_intact=outcome.immutability_intact,
+            scenario=outcome.scenario,
+        )
+    )
+    result = metrics_store.defensibility()
+    return {
+        "status": "recorded",
+        "incident_id": outcome.incident_id,
+        "defensibility_index": result.as_dict()["defensibility_index"],
+        "sample_size": result.sample_size,
+    }
+
+
+def _threat_level(value: str) -> ThreatLevel:
+    try:
+        return ThreatLevel(value)
+    except ValueError:
+        return ThreatLevel.LOW
+
+
 @router.get("/summary", response_model=DashboardSummary)
 async def get_dashboard_summary():
-    """Get complete dashboard summary with real-time metrics."""
-    
+    """Complete dashboard summary computed from recorded incident metrics."""
+    summary = metrics_store.summary()
+    di = summary["defensibility"]
+    comp = di["components"]
+    total = summary["incidents_total"]
+
     metrics = IncidentMetrics(
-        total_incidents=47,
-        active_incidents=2,
-        total_files_affected=125000,
-        files_recovered=124750,
-        mttc_average=45.3,
-        mttc_target=60.0,
-        mttc_achieved=True,
-        containment_success_rate=0.98,
-        data_loss_percentage=0.2
+        total_incidents=total,
+        active_incidents=0,
+        total_files_affected=0,
+        files_recovered=summary["incidents_fully_recovered"],
+        mttc_average=round(summary["mttc_seconds"], 2),
+        mttc_target=float(settings.MTTC_TARGET_SECONDS),
+        mttc_achieved=(total > 0 and summary["mttc_seconds"] <= settings.MTTC_TARGET_SECONDS),
+        containment_success_rate=round(comp["containment"], 4),
+        data_loss_percentage=round((1.0 - summary["recovery_fidelity"]) * 100, 2),
     )
-    
-    di = DefensibilityIndex(
-        overall_score=87,
-        detection_score=92,
-        isolation_score=85,
-        recovery_score=88,
-        immutability_score=79,
-        timestamp=datetime.utcnow(),
-        community_percentile=76
+
+    defensibility = DefensibilityIndex(
+        overall_score=di["score_0_100"],
+        detection_score=int(round(comp["detection"] * 100)),
+        isolation_score=int(round(comp["containment"] * 100)),
+        recovery_score=int(round(comp["recovery"] * 100)),
+        immutability_score=int(round(comp["prevention"] * 100)),
+        timestamp=datetime.now(timezone.utc),
+        community_percentile=None,
     )
-    
+
     health = SystemHealth(
-        status="healthy",
+        status="healthy" if total else "idle",
         components={
-            "forge": "healthy",
             "vigil": "healthy",
             "shield": "operational",
-            "storage": "healthy",
-            "messaging": "healthy"
+            "grab": "healthy",
+            "storage": "healthy" if getattr(metrics_store, "_di", None) else "unknown",
         },
-        last_heartbeat=datetime.utcnow(),
-        uptime_seconds=2592000  # 30 days
+        last_heartbeat=datetime.now(timezone.utc),
+        uptime_seconds=0,
     )
-    
+
+    recent = metrics_store.snapshot()[-5:]
     recent_events = [
         DetectionEvent(
-            event_id="evt_001",
-            timestamp=datetime.utcnow(),
-            threat_type="mass_modification",
-            threat_level=ThreatLevel.HIGH,
-            affected_path="C:\\Users\\Documents",
-            file_count=5420,
-            entropy_score=0.87,
-            confidence=0.94,
-            details={"action": "isolated", "duration_ms": 2300}
-        ),
-        DetectionEvent(
-            event_id="evt_002",
-            timestamp=datetime.utcnow(),
-            threat_type="vssadmin_abuse",
-            threat_level=ThreatLevel.CRITICAL,
-            affected_path="\\\\shadow copy",
-            file_count=850,
+            event_id=i.incident_id,
+            timestamp=datetime.now(timezone.utc),
+            threat_type=i.scenario or "behavioral_anomaly",
+            threat_level=ThreatLevel.CRITICAL if i.apcr > 0.5 else ThreatLevel.HIGH,
+            affected_path="n/a",
+            file_count=0,
             entropy_score=0.0,
-            confidence=0.99,
-            details={"action": "blocked", "prevention_time_ms": 150}
+            confidence=1.0 if i.true_positive else 0.5,
+            details={"mttc_seconds": i.mttc_seconds, "apcr": i.apcr},
         )
+        for i in recent
     ]
-    
+
     return DashboardSummary(
         metrics=metrics,
-        defensibility_index=di,
+        defensibility_index=defensibility,
         system_health=health,
         recent_events=recent_events,
-        active_incidents=2
+        active_incidents=0,
     )
+
 
 @router.get("/metrics/mttc")
 async def get_mttc_metrics():
-    """Get Mean Time to Contain metrics and trends."""
+    """Mean Time to Contain, measured from recorded incidents."""
+    summary = metrics_store.summary()
+    mttc = summary["mttc_seconds"]
+    target = float(settings.MTTC_TARGET_SECONDS)
     return {
-        "current_mttc": 45.3,
-        "target_mttc": 60.0,
-        "status": "beating_target",
-        "trend_24h": -2.5,  # Improvement
-        "trend_7d": -5.1,
-        "incidents_contained_within_target": 46,
-        "total_incidents": 47,
-        "containment_rate": "97.9%",
+        "current_mttc": round(mttc, 2),
+        "target_mttc": target,
+        "status": "beating_target" if (summary["incidents_total"] and mttc <= target) else "no_data"
+        if not summary["incidents_total"]
+        else "over_target",
+        "sample_size": summary["incidents_total"],
         "details": {
-            "average_detection_time": 3.2,
-            "average_isolation_time": 2.1,
-            "average_confirmation_time": 40.0
-        }
+            "mttd_seconds": round(summary["mttd_seconds"], 2),
+            "mttc_seconds": round(mttc, 2),
+            "false_positive_rate": round(summary["false_positive_rate"], 4),
+        },
     }
+
 
 @router.get("/defensibility-index")
 async def get_defensibility_index():
-    """Get current Defensibility Index and component scores."""
+    """Current Defensibility Index and component scores (measured)."""
+    result = metrics_store.defensibility()
+    d = result.as_dict()
+    comp = d["components"]
+    weights = d["weights"]
+    di_score = d["score_0_100"]
+    rank = (
+        "A (Excellent)" if di_score >= 90 else
+        "B (Strong)" if di_score >= 75 else
+        "C (Adequate)" if di_score >= 60 else
+        "D (At Risk)" if di_score > 0 else
+        "N/A (no data)"
+    )
     return {
-        "overall_score": 87,
+        "defensibility_index": d["defensibility_index"],
+        "overall_score": di_score,
         "max_score": 100,
-        "rank": "A (Excellent)",
+        "rank": rank,
+        "sample_size": d["sample_size"],
         "components": {
-            "detection": {
-                "score": 92,
-                "weight": 0.3,
-                "description": "Behavioral ML detection capabilities"
-            },
-            "isolation": {
-                "score": 85,
-                "weight": 0.3,
-                "description": "Micro-segmentation and automated response"
-            },
-            "recovery": {
-                "score": 88,
-                "weight": 0.2,
-                "description": "Recovery automation and snapshot management"
-            },
-            "immutability": {
-                "score": 79,
-                "weight": 0.2,
-                "description": "Log immutability and forensic preservation"
-            }
+            "detection": {"score": comp["detection"], "weight": weights["detection"],
+                          "description": "MTTD efficiency (1 - MTTD/T_drrt)"},
+            "containment": {"score": comp["containment"], "weight": weights["containment"],
+                            "description": "MTTC efficiency (1 - MTTC/90s)"},
+            "prevention": {"score": comp["prevention"], "weight": weights["prevention"],
+                           "description": "Prevention (1 - APCR)"},
+            "recovery": {"score": comp["recovery"], "weight": weights["recovery"],
+                         "description": "Recovery fidelity"},
         },
-        "community_benchmark": {
-            "your_score": 87,
-            "community_median": 65,
-            "top_percentile": 76,
-            "message": "Your defensibility is in the top 25% of organizations using Resilience Forge"
-        },
-        "improvement_recommendations": [
-            "Increase immutability score by implementing legal hold on all forensic buckets",
-            "Expand behavioral detection patterns for ransomware variants",
-            "Deploy edge watchers for faster entropy analysis"
-        ]
+        "metrics": d["metrics"],
     }
+
 
 @router.get("/config")
 async def get_configuration():
-    """Get current system configuration and thresholds."""
+    """Current system configuration and thresholds (reflects live settings)."""
     return {
         "thresholds": {
-            "mass_modification_rate": 0.15,
-            "entropy_threshold": 0.85,
-            "kerberos_abuse_attempts": 5,
-            "vssadmin_call_detections": 1
+            "mass_modification_rate": settings.MASS_MODIFICATION_THRESHOLD,
+            "entropy_threshold": settings.ENTROPY_THRESHOLD,
+            "vigil_decision_threshold": settings.VIGIL_DECISION_THRESHOLD,
+            "mttc_target_seconds": settings.MTTC_TARGET_SECONDS,
         },
-        "detection_modes": {
-            "behavioral_ml": True,
-            "entropy_analysis": True,
-            "lateral_movement": True,
-            "privilege_abuse": True
+        "defensibility_weights": {
+            "detection": settings.DI_WEIGHT_DETECTION,
+            "containment": settings.DI_WEIGHT_ISOLATION,
+            "prevention": settings.DI_WEIGHT_RECOVERY,
+            "recovery": settings.DI_WEIGHT_IMMUTABILITY,
         },
-        "isolation_modes": {
-            "vlan_auto_isolate": True,
-            "process_termination": True,
-            "credential_revocation": False,  # Manual review required
-            "object_lock_activation": True
-        },
-        "recovery_settings": {
-            "auto_start_recovery": False,  # Manual approval
-            "snapshot_frequency": "hourly",
-            "retention_days": 30,
-            "parallel_recovery_threads": 8
-        }
     }
 
-@router.put("/config/thresholds")
-async def update_thresholds(
-    mass_modification_threshold: float = None,
-    entropy_threshold: float = None,
-    sensitivity_level: str = None  # "strict", "balanced", "permissive"
-):
-    """Update detection thresholds interactively."""
-    return {
-        "status": "updated",
-        "changes": {
-            "mass_modification_threshold": mass_modification_threshold or 0.15,
-            "entropy_threshold": entropy_threshold or 0.85,
-            "sensitivity_level": sensitivity_level or "balanced"
-        },
-        "message": "Configuration updated. Changes will apply to new detections immediately."
-    }
 
 @router.get("/incidents")
 async def list_incidents(limit: int = 50):
-    """List recent incidents with summary data."""
+    """List recorded incidents."""
+    incidents = metrics_store.snapshot()[-limit:]
     return {
-        "total_incidents": 47,
+        "total_incidents": len(metrics_store.snapshot()),
         "incidents": [
             {
-                "incident_id": "inc_001",
-                "timestamp": datetime.utcnow().isoformat(),
-                "severity": "critical",
-                "files_affected": 15000,
-                "contained_in_seconds": 42.3,
-                "status": "recovered",
-                "defensibility_score": 92
-            },
-            {
-                "incident_id": "inc_002",
-                "timestamp": datetime.utcnow().isoformat(),
-                "severity": "high",
-                "files_affected": 3200,
-                "contained_in_seconds": 38.1,
-                "status": "recovered",
-                "defensibility_score": 88
+                "incident_id": i.incident_id,
+                "scenario": i.scenario,
+                "timestamp": i.timestamp,
+                "mttd_seconds": i.mttd_seconds,
+                "mttc_seconds": i.mttc_seconds,
+                "apcr": i.apcr,
+                "recovery_fidelity": i.recovery_fidelity,
+                "true_positive": i.true_positive,
             }
-        ][:limit]
-    }
-
-@router.get("/incidents/{incident_id}")
-async def get_incident_details(incident_id: str):
-    """Get detailed information about a specific incident."""
-    return {
-        "incident_id": incident_id,
-        "timestamp": datetime.utcnow().isoformat(),
-        "severity": "critical",
-        "detection_events": [
-            {
-                "time": 0.5,
-                "event": "mass_modification_detected",
-                "confidence": 0.94,
-                "files_affected": 15000
-            },
-            {
-                "time": 2.1,
-                "event": "vlan_isolation_activated",
-                "result": "success"
-            },
-            {
-                "time": 42.3,
-                "event": "containment_achieved",
-                "mttc": 42.3
-            }
+            for i in incidents
         ],
-        "recovery_status": "completed",
-        "files_recovered": 14985,
-        "data_loss": 15,
-        "llm_insights": "Lateral movement attack via compromised admin account. Contained successfully."
     }
 
-@router.post("/alerts/configure")
-async def configure_alerts(
-    alert_type: str,
-    enabled: bool,
-    threshold: float = None
-):
-    """Configure alert settings for specific threat types."""
-    return {
-        "status": "configured",
-        "alert_type": alert_type,
-        "enabled": enabled,
-        "threshold": threshold,
-        "message": f"Alert configuration for {alert_type} updated"
-    }
 
 @router.get("/status")
 async def dashboard_status():
-    """Check Dashboard operational status."""
+    """Dashboard operational status."""
     return {
         "status": "operational",
+        "sample_size": len(metrics_store.snapshot()),
         "components": {
             "metrics_collection": "healthy",
-            "data_visualization": "healthy",
-            "alert_system": "healthy",
-            "configuration_ui": "healthy"
+            "defensibility_engine": "healthy",
         },
-        "data_freshness": {
-            "metrics": "real-time",
-            "events": "< 1 second",
-            "incidents": "< 5 seconds"
-        }
     }
