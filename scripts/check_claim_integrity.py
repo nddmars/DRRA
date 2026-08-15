@@ -30,6 +30,11 @@ MATRIX = os.path.join(REPO, "docs", "CLAIM_TRACEABILITY.md")
 # file references like backend/services/foo.py, tests/bar.rs, lab/lab_manifest.json
 PATH_RE = re.compile(r"[\w./-]+\.(?:py|rs|md|json|yaml|yml|toml)")
 
+# Generated outputs are produced by running a generator; they are not committed,
+# so a fresh checkout won't contain them. The generator SOURCE existing is the
+# real evidence, so evidence paths under these prefixes are not required to exist.
+GENERATED_PREFIXES = ("results/",)
+
 
 def main() -> int:
     if not os.path.exists(MATRIX):
@@ -54,9 +59,11 @@ def main() -> int:
         if not status.lower().startswith("implemented"):
             continue
         implemented_rows += 1
-        paths = PATH_RE.findall(evidence)
+        # only require committed source evidence, not generated outputs
+        paths = [p for p in PATH_RE.findall(evidence)
+                 if not p.startswith(GENERATED_PREFIXES)]
         if not paths:
-            print(f"::error::Implemented row cites no evidence file: {cells[0]!r}")
+            print(f"::error::Implemented row cites no committed evidence file: {cells[0]!r}")
             violations += 1
             continue
         for rel in paths:
