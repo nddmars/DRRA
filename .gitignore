@@ -103,8 +103,8 @@ node_modules/
 dist/
 *.tsbuildinfo
 
-# Internal tooling files
-.claude/
+# Local temporary files
+.localtemp/
 
 # Experiment outputs
 results/
