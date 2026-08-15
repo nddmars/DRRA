@@ -8,8 +8,12 @@ Produces (into results/figures/):
   * figure4_recovery_protection.png— Recovery fidelity & prevention (Table 6)
   * figure5_fpr_defensibility.png  — False-positive rate & DI (Table 6)
 
-Every figure is computed from the real models / DI engine — no hard-coded plot
-data. Run: python scripts/generate_figures.py
+Figure 2 and every WSG data point are computed from the real models / DI engine.
+The *comparator* rows in Figures 3–5 (conventional-ML / SOAR / backup-centric)
+are illustrative capability assumptions, NOT measured on this bench — the plots
+label them as such and they are excluded from superiority claims (DRRA-081). The
+WSG false-positive rate is the measured value from scripts/run_fpr_eval.py, not a
+placeholder. Run: python scripts/generate_figures.py
 """
 
 from __future__ import annotations
@@ -42,7 +46,14 @@ def _load(name, rel):
 
 di_mod = _load("wsg_defensibility", "backend/services/defensibility.py")
 feedback = _load("wsg_feedback", "scripts/run_feedback_experiment.py")
+fpr_eval = _load("wsg_fpr_eval_fig", "scripts/run_fpr_eval.py")
 DefensibilityIndex = di_mod.DefensibilityIndex
+
+
+def _measured_wsg_fpr_pct():
+    """Measured WSG false-positive rate (%) on held-out benign workloads —
+    replaces the former hard-coded 0.0 so no figure states an unmeasured FPR."""
+    return round(fpr_eval.evaluate(n_benign=400, n_pos=200)["fpr"] * 100, 1)
 
 
 def _style():
@@ -54,22 +65,35 @@ def _style():
     })
 
 
-# --- Table 6 comparator profiles (stated capability assumptions; WSG measured) --
+# --- Comparator profiles ------------------------------------------------------
+# The three comparator columns are ILLUSTRATIVE capability assumptions for
+# architecture *classes* — not measured on this bench, and excluded from any
+# superiority claim (DRRA-081). Only the WSG column is measured: its latency /
+# recovery / APCR come from the DRRA harness, and its FPR is the measured value
+# from scripts/run_fpr_eval.py (filled in at render time, not hard-coded to 0).
 ARCHS = ["Conventional\nML detection", "SOAR-based\nautomation", "Backup-centric\nrecovery", "Proposed\nWSG"]
 PROFILE = {
     "mttd": [12.0, 15.0, 300.0, 2.5],
     "mttc": [900.0, 45.0, 1800.0, 7.8],
     "rf":   [93.0, 94.5, 97.5, 100.0],
-    "fpr":  [4.8, 3.9, 4.5, 0.0],
+    "fpr":  [4.8, 3.9, 4.5, None],   # WSG filled with the measured FPR at render
     "apcr": [0.90, 0.55, 0.98, 0.46],
 }
 
 
-def _di_row(i):
+def _fpr_series():
+    """PROFILE['fpr'] with the WSG entry replaced by the measured FPR (%)."""
+    series = list(PROFILE["fpr"])
+    series[-1] = _measured_wsg_fpr_pct()
+    return series
+
+
+def _di_row(i, fpr_series=None):
+    fpr_series = fpr_series if fpr_series is not None else _fpr_series()
     r = DefensibilityIndex().score(
         mttd_seconds=PROFILE["mttd"][i], mttc_seconds=PROFILE["mttc"][i],
         apcr=PROFILE["apcr"][i], recovery_fidelity=PROFILE["rf"][i] / 100.0,
-        false_positive_rate=PROFILE["fpr"][i] / 100.0,
+        false_positive_rate=fpr_series[i] / 100.0,
     )
     return r.defensibility_index
 
@@ -116,7 +140,8 @@ def figure3():
     ax.set_yscale("log")
     ax.set_ylabel("Seconds (log scale)")
     ax.set_xticks(x); ax.set_xticklabels(ARCHS)
-    ax.set_title("Figure 3. Detection and containment latency by architecture")
+    ax.set_title("Figure 3. Detection and containment latency by architecture\n"
+                 "(comparators illustrative; WSG measured)")
     ax.legend(frameon=False)
     _label_bars(ax, b1); _label_bars(ax, b2)
     _save(fig, "figure3_mean_times.png")
@@ -132,17 +157,18 @@ def figure4():
     ax.set_ylabel("Percent")
     ax.set_ylim(0, 110)
     ax.set_xticks(x); ax.set_xticklabels(ARCHS)
-    ax.set_title("Figure 4. Recovery and prevention performance")
+    ax.set_title("Figure 4. Recovery and prevention performance\n"
+                 "(comparators illustrative; WSG measured)")
     ax.legend(frameon=False)
     _label_bars(ax, b1); _label_bars(ax, b2)
     _save(fig, "figure4_recovery_protection.png")
 
 
 def figure5():
-    import numpy as np
-    di = [_di_row(i) for i in range(len(ARCHS))]
+    fpr_series = _fpr_series()   # WSG entry is the measured FPR, not 0
+    di = [_di_row(i, fpr_series) for i in range(len(ARCHS))]
     fig, (axL, axR) = plt.subplots(1, 2, figsize=(9, 4))
-    b1 = axL.bar(ARCHS, PROFILE["fpr"], color=_bar_colors())
+    b1 = axL.bar(ARCHS, fpr_series, color=_bar_colors())
     axL.set_ylabel("False-positive rate (%)"); axL.set_title("False-positive rate")
     axL.set_xticklabels(ARCHS, fontsize=8)
     _label_bars(axL, b1)
@@ -151,7 +177,8 @@ def figure5():
     axR.set_ylim(0, 1.0)
     axR.set_xticklabels(ARCHS, fontsize=8)
     _label_bars(axR, b2, fmt="{:.2f}")
-    fig.suptitle("Figure 5. False-positive rate and Defensibility Index by architecture")
+    fig.suptitle("Figure 5. False-positive rate and Defensibility Index by architecture\n"
+                 "(comparators illustrative; WSG FPR measured on held-out benign)")
     _save(fig, "figure5_fpr_defensibility.png")
 
 
