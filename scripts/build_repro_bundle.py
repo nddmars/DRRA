@@ -1,16 +1,24 @@
 #!/usr/bin/env python3
 """
-DRRA-078 — Exact, seeded reproducibility bundle.
+DRRA-078 — Exact, seeded reproducibility bundle (SYNTHETIC scenario experiment).
 
-Runs the adversarial-replay evaluation at a declared seed and archives the raw
-per-run observations (not only aggregates), the 95% confidence intervals, the
-execution environment, and input-dataset provenance, with a SHA-256 manifest.
+Runs the **synthetic scenario** adversarial-replay evaluation at a declared seed
+and archives the raw per-run observations (not only aggregates), the 95%
+confidence intervals, and the execution environment, with a SHA-256 manifest.
 Re-running at the same seed reproduces byte-identical raw observations, so any
 reported aggregate can be traced back to individual runs.
 
+IMPORTANT — provenance honesty: the inputs to these runs are produced by the
+seeded synthetic scenario generator (``run_scenario_once``), NOT by the OTRF
+datasets. This bundle therefore does not, and must not, claim OTRF dataset
+provenance for its results. Real-telemetry ingestion has its own path
+(``scripts/run_real_data.py`` over ``scripts/fetch_datasets.py``); reproducing
+that end to end is separate future work.
+
 Usage:
     python scripts/build_repro_bundle.py --reps 30 --seed 1234
-    # -> results/repro_bundle/{raw_runs.json, aggregates.json, environment.json, MANIFEST.json}
+    # -> results/synthetic_scenario_repro_bundle/{raw_runs.json, aggregates.json,
+    #    environment.json, MANIFEST.json}
 """
 
 from __future__ import annotations
@@ -25,7 +33,7 @@ import subprocess
 import sys
 
 REPO = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-OUT = os.path.join(REPO, "results", "repro_bundle")
+OUT = os.path.join(REPO, "results", "synthetic_scenario_repro_bundle")
 
 
 def _load(name, rel):
@@ -108,15 +116,20 @@ def _environment() -> dict:
         except Exception:
             return "unknown"
 
-    manifest = os.path.join(REPO, "data", "otrf", "manifest.json")
-    datasets = json.load(open(manifest)) if os.path.exists(manifest) else {"note": "run scripts/fetch_datasets.py"}
     return {
         "python": sys.version.split()[0],
         "platform": platform.platform(),
         "packages": {m: ver(m) for m in ("numpy", "sklearn", "scipy")},
         "git_commit": git("rev-parse", "HEAD"),
         "git_status_clean": git("status", "--porcelain") == "",
-        "input_datasets": datasets,
+        # Inputs are the seeded synthetic scenario generator — NOT OTRF datasets.
+        # Do not attach OTRF provenance here; these runs do not consume it.
+        "inputs": {
+            "source": "synthetic scenario generator (run_scenario_once), seeded",
+            "otrf_datasets_used": False,
+            "note": "OTRF real-telemetry ingestion is a separate path "
+                    "(scripts/run_real_data.py); it is not an input to this bundle.",
+        },
     }
 
 
@@ -155,8 +168,8 @@ def main():
         json.dump({"seed": args.seed, "reps": args.reps, "sha256": manifest}, f, indent=2, sort_keys=True)
 
     total = sum(len(v["runs"]) for v in bundle["conditions"].values())
-    print(f"[*] Reproducibility bundle written to results/repro_bundle/ "
-          f"({total} raw runs, seed={args.seed})")
+    print(f"[*] Synthetic-scenario reproducibility bundle written to "
+          f"results/synthetic_scenario_repro_bundle/ ({total} raw runs, seed={args.seed})")
     for name, digest in manifest.items():
         print(f"    {name}: {digest[:16]}…")
 
