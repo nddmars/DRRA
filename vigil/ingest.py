@@ -76,9 +76,14 @@ class WindowFeature:
 class IngestStats:
     total_events: int = 0
     parsed_events: int = 0
+    malformed_lines: int = 0          # JSON lines that failed to parse (not silent)
     hosts: set = field(default_factory=set)
     signal_events: Dict[str, int] = field(default_factory=lambda: {
         "file": 0, "lateral": 0, "privesc": 0, "shadow": 0})
+
+    @property
+    def total_signals(self) -> int:
+        return sum(self.signal_events.values())
 
 
 def _parse_ts(value: str) -> Optional[float]:
@@ -93,8 +98,11 @@ def _parse_ts(value: str) -> Optional[float]:
     return None
 
 
-def parse_events(path: str) -> Iterable[dict]:
-    """Yield event dicts from an OTRF JSON-lines dataset (or a plain JSON list)."""
+def parse_events(path: str, stats: Optional["IngestStats"] = None) -> Iterable[dict]:
+    """Yield event dicts from an OTRF JSON-lines dataset (or a plain JSON list).
+
+    Malformed JSON lines are counted on ``stats.malformed_lines`` (if provided)
+    instead of being silently discarded, so ingestion failures are observable."""
     with open(path, "r", encoding="utf-8", errors="replace") as fh:
         first = fh.read(1)
         fh.seek(0)
@@ -109,6 +117,8 @@ def parse_events(path: str) -> Iterable[dict]:
             try:
                 yield json.loads(line)
             except json.JSONDecodeError:
+                if stats is not None:
+                    stats.malformed_lines += 1
                 continue
 
 
@@ -177,7 +187,7 @@ def extract_windows(
     events: List[Tuple[float, str, str]] = []   # (ts, host, family)
     t_min: Optional[float] = None
 
-    for e in parse_events(path):
+    for e in parse_events(path, stats):
         stats.total_events += 1
         ts = _parse_ts(e.get("TimeCreated", e.get("@timestamp", "")))
         if ts is None:

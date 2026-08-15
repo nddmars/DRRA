@@ -32,7 +32,9 @@ OTRF = os.path.join(REPO, "data", "otrf")
 
 
 def find_datasets():
-    return sorted(glob.glob(os.path.join(OTRF, "*", "*.json")))
+    # recursive: OTRF archives nest event JSON at varying depths
+    found = glob.glob(os.path.join(OTRF, "**", "*.json"), recursive=True)
+    return sorted(p for p in found if os.path.basename(p) != "manifest.json")
 
 
 def main():
@@ -58,14 +60,21 @@ def main():
         results.append({
             "dataset": name,
             "events": stats.total_events,
+            "malformed_lines": stats.malformed_lines,
             "signal_events": stats.signal_events,
+            "total_signals": stats.total_signals,
             "windows": len(feats),
             "flagged": len(flagged),
             "peak_privesc_per_s": round(peak_priv, 3),
             "peak_file_per_s": round(peak_file, 3),
         })
-        print(f"  {name:22} events={stats.total_events:5}  "
-              f"signals={stats.signal_events}  windows={len(feats)}  flagged={len(flagged)}")
+        warn = ""
+        if stats.total_events and stats.total_signals == 0:
+            warn = "  [!] zero signals — possible schema mismatch"
+        if stats.malformed_lines:
+            warn += f"  [!] {stats.malformed_lines} malformed line(s)"
+        print(f"  {name:22} events={stats.total_events:5}  malformed={stats.malformed_lines:3}  "
+              f"signals={stats.total_signals:4}  windows={len(feats)}  flagged={len(flagged)}{warn}")
 
     os.makedirs(os.path.join(REPO, os.path.dirname(args.out)), exist_ok=True)
     with open(os.path.join(REPO, args.out), "w") as f:
