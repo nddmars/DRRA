@@ -75,6 +75,12 @@ class WormFileStore:
         if name in self._locked_until and self._clock < self._locked_until[name]:
             raise ImmutabilityError(f"object '{name}' is locked (WORM retention)")
         os.makedirs(os.path.dirname(path), exist_ok=True)
+        # A prior version was written read-only on disk; once its retention has
+        # expired (checked above) restore write permission so the rewrite is not
+        # blocked by the on-disk mode. (root bypasses the mode bit, so this only
+        # bites as a non-root user — e.g. in CI.)
+        if os.path.exists(path):
+            os.chmod(path, stat.S_IWUSR | stat.S_IRUSR)
         with open(path, "wb") as f:
             f.write(data)
         os.chmod(path, stat.S_IRUSR | stat.S_IRGRP)  # read-only on disk too
