@@ -5,108 +5,167 @@ on:
     branches: [ main, develop ]
   pull_request:
     branches: [ main, develop ]
+  workflow_dispatch: {}
+
+# Least-privilege token; individual jobs opt into more where needed.
+permissions:
+  contents: read
+
+# One in-flight run per ref; new pushes cancel superseded runs.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Detection-quality gate (DRRA-086): budgets on the held-out benign set.
+  FPR_BUDGET: "0.45"        # max acceptable benign false-positive rate
+  RECALL_FLOOR: "0.90"      # min acceptable recall on ransomware windows
+  # Coverage gate (DRRA-085 quality gate): floor to ratchet upward over time.
+  COV_MIN: "40"
 
 jobs:
+  # ---------------------------------------------------------------- quality gate: tests
   test-backend:
     runs-on: ubuntu-latest
-    name: Test Python Backend
-    
+    name: Test Python Backend (3.11)
     strategy:
       matrix:
         python-version: ['3.11']
-    
     steps:
-    - uses: actions/checkout@v3
-    
+    - uses: actions/checkout@v4
+
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v4
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
-    
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         pip install pytest pytest-asyncio pytest-cov
-    
-    - name: Lint with flake8
+
+    - name: Confirm non-root test execution (DRRA-085)
+      run: |
+        # GitHub-hosted runners execute as an unprivileged user; assert it so a
+        # root-only regression (e.g. a read-only-file overwrite) is caught here.
+        test "$(id -u)" -ne 0 || { echo "::error::tests must not run as root"; exit 1; }
+        echo "Running as UID $(id -u) ($(whoami)) — non-root OK"
+
+    - name: Lint (syntax / undefined names) — QUALITY GATE
       run: |
         pip install flake8
         flake8 backend/ vigil/ scripts/ --count --select=E9,F63,F7,F82 --show-source --statistics
 
-    - name: Run tests
+    - name: Run tests with coverage floor — QUALITY GATE
       run: |
-        pytest tests/ -v --tb=short --cov=backend --cov=vigil --cov-report=xml
+        pytest tests/ -v --tb=short \
+          --cov=backend --cov=vigil --cov-report=xml --cov-report=term-missing \
+          --cov-fail-under=${COV_MIN}
 
     - name: Reproduce experiment metrics (smoke)
       run: |
         python scripts/run_experiment.py --reps 5 --out results/ci_experiment.json
         python scripts/run_feedback_experiment.py --cycles 5 --out results/ci_feedback.json
-    
+
     - name: Upload coverage
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v4
       with:
         file: ./coverage.xml
         flags: unittests
         name: codecov-umbrella
+      continue-on-error: true
+
+  # ---------------------------------------------------------------- quality gate: detection SLO
+  detection-quality-gate:
+    runs-on: ubuntu-latest
+    name: Detection-Quality Gate (DRRA-086)
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    - name: Enforce FPR budget and recall floor on held-out set
+      run: |
+        python - <<'PY'
+        import os, importlib.util
+        spec = importlib.util.spec_from_file_location("fpr", "scripts/run_fpr_eval.py")
+        fpr = importlib.util.module_from_spec(spec); spec.loader.exec_module(fpr)
+        r = fpr.evaluate(n_benign=400, n_pos=200, seed=4242)
+        budget = float(os.environ["FPR_BUDGET"]); floor = float(os.environ["RECALL_FLOOR"])
+        print(f"backend={r['backend']} FPR={r['fpr']:.4f} (budget {budget}) "
+              f"recall={r['recall']:.4f} (floor {floor})")
+        fail = False
+        if r["fpr"] > budget:
+            print(f"::error::benign FPR {r['fpr']:.4f} exceeds budget {budget}"); fail = True
+        if r["recall"] < floor:
+            print(f"::error::recall {r['recall']:.4f} below floor {floor}"); fail = True
+        raise SystemExit(1 if fail else 0)
+        PY
+
+  # ---------------------------------------------------------------- quality gate: claim integrity
+  claim-integrity-gate:
+    runs-on: ubuntu-latest
+    name: Claim-Integrity Gate (DRRA-087)
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    - name: Verify the traceability matrix is present and self-consistent
+      run: python scripts/check_claim_integrity.py
 
   test-watcher:
     runs-on: ubuntu-latest
     name: Test Rust Watcher
-    
     steps:
-    - uses: actions/checkout@v3
-    
+    - uses: actions/checkout@v4
     - name: Install Rust
-      uses: actions-rs/toolchain@v1
+      uses: dtolnay/rust-toolchain@stable
       with:
-        toolchain: stable
-        profile: minimal
-    
+        components: rustfmt, clippy
     - name: Check formatting
       run: cd watchers && cargo fmt -- --check
-    
     - name: Run clippy
       run: cd watchers && cargo clippy -- -D warnings
-    
     - name: Run tests
       run: cd watchers && cargo test --verbose
-    
     - name: Build release
       run: cd watchers && cargo build --release
 
   build-dashboard:
     runs-on: ubuntu-latest
-    name: Build React Dashboard
-    
+    name: Build React Dashboard (18.x)
     strategy:
       matrix:
         node-version: ['18.x']
-    
     steps:
-    - uses: actions/checkout@v3
-    
+    - uses: actions/checkout@v4
     - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@v4
       with:
         node-version: ${{ matrix.node-version }}
-    
     - name: Install dependencies
       run: cd dashboard && npm install
-    
     - name: Build
       run: cd dashboard && npm run build
-    
     - name: Test
       run: cd dashboard && npm test -- --passWithNoTests
 
   security-scan:
     runs-on: ubuntu-latest
     name: Security Scanning
-    
+    permissions:
+      contents: read
+      security-events: write
     steps:
-    - uses: actions/checkout@v3
-    
+    - uses: actions/checkout@v4
     - name: Run Trivy vulnerability scanner
       uses: aquasecurity/trivy-action@master
       with:
@@ -114,47 +173,52 @@ jobs:
         scan-ref: '.'
         format: 'sarif'
         output: 'trivy-results.sarif'
-    
     - name: Upload Trivy results to GitHub Security
-      uses: github/codeql-action/upload-sarif@v2
+      uses: github/codeql-action/upload-sarif@v3
       with:
         sarif_file: 'trivy-results.sarif'
+      continue-on-error: true
 
-  docker-build:
+  # ---------------------------------------------------------------- aggregate gate
+  quality-gates:
     runs-on: ubuntu-latest
-    name: Build Docker Image
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    needs: [test-backend, test-watcher, build-dashboard]
-    
+    name: Quality Gates
+    if: always()
+    needs: [test-backend, detection-quality-gate, claim-integrity-gate, test-watcher, build-dashboard, security-scan]
     steps:
-    - uses: actions/checkout@v3
-    
+    - name: Require all gates to pass
+      run: |
+        declare -A R=(
+          [tests]="${{ needs.test-backend.result }}"
+          [detection-SLO]="${{ needs.detection-quality-gate.result }}"
+          [claim-integrity]="${{ needs.claim-integrity-gate.result }}"
+          [rust-watcher]="${{ needs.test-watcher.result }}"
+          [dashboard]="${{ needs.build-dashboard.result }}"
+          [security]="${{ needs.security-scan.result }}"
+        )
+        fail=0
+        for k in "${!R[@]}"; do
+          echo "gate: $k = ${R[$k]}"
+          if [ "${R[$k]}" != "success" ]; then echo "::error::gate '$k' did not pass"; fail=1; fi
+        done
+        exit $fail
+
+  # ---------------------------------------------------------------- continuous delivery
+  build-image:
+    runs-on: ubuntu-latest
+    name: Build & Package Image
+    # CD proceeds only when every quality gate is green, and only on main.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: [quality-gates]
+    steps:
+    - uses: actions/checkout@v4
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v2
-    
-    - name: Build Docker image
-      uses: docker/build-push-action@v4
+      uses: docker/setup-buildx-action@v3
+    - name: Build image (packaged deliverable)
+      uses: docker/build-push-action@v6
       with:
         context: .
         push: false
-        tags: resilience-forge:latest
+        tags: drra/resilience-forge:${{ github.sha }}
         cache-from: type=gha
         cache-to: type=gha,mode=max
-
-  notify:
-    runs-on: ubuntu-latest
-    name: Notify Status
-    if: always()
-    needs: [test-backend, test-watcher, build-dashboard, security-scan]
-    
-    steps:
-    - name: Check job status
-      run: |
-        if [ "${{ needs.test-backend.result }}" = "failure" ] || \
-           [ "${{ needs.test-watcher.result }}" = "failure" ] || \
-           [ "${{ needs.build-dashboard.result }}" = "failure" ]; then
-          echo "❌ CI/CD Pipeline Failed"
-          exit 1
-        else
-          echo "✅ CI/CD Pipeline Passed"
-        fi

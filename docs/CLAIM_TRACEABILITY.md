@@ -32,6 +32,9 @@ as such wherever reported · **Future** = not yet built.
 | Near-linear enterprise-scale scalability | Future | Complexity analysis only; measured scale/soak = Future (DRRA-055) |
 | 10-VM enterprise lab (reproducible definition) | Partial | `lab/lab_manifest.json`, `scripts/validate_lab.py`, `tests/test_lab_provisioning.py` (DRRA-077): pinned control-plane images + declarative endpoint tier whose scenarios map to fetchable OTRF captures, validated for reproducibility; standing up the live VMs and collecting fresh telemetry = Future (external evidence) |
 | Rust watcher forwards real filesystem events | Implemented | `watchers/src/lib.rs`; `cargo test` |
+| Deterministic, backend-independent model training | Implemented | `tests/test_determinism.py` (DRRA-085): seeded training reproducible across sklearn/TF; CI asserts non-root execution |
+| Detection-quality SLO enforced as a CI gate | Implemented | `.github/workflows/ci-cd.yml` detection-quality-gate + `scripts/run_fpr_eval.py` (DRRA-086): FPR budget + recall floor |
+| Claim-integrity enforced (every Implemented row's evidence exists) | Implemented | `scripts/check_claim_integrity.py` (DRRA-087); runs as a CI gate |
 
 ## Rule
 No performance number may be stated as measured unless its row above is
