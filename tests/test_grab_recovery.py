@@ -110,3 +110,37 @@ def test_immutability_failure_zeroes_all_assets():
         report = drill.validate(tamper_blocked=False)
         assert report.passed == 0
         assert all(res.immutability is False for res in report.per_asset.values())
+
+
+# --- DRRA-083 finding 4: path-traversal / escape safety ---------------------
+
+def test_worm_store_rejects_absolute_and_traversal_names():
+    from backend.services.grab_recovery import UnsafePathError
+    with tempfile.TemporaryDirectory() as tmp:
+        store = WormFileStore(os.path.join(tmp, "s"))
+        for bad in ["../escape.bin", "a/../../escape.bin", "/etc/passwd",
+                    "\\\\server\\share\\x", "C:\\windows\\x", "", "   "]:
+            with pytest.raises(UnsafePathError):
+                store.put(bad, b"x")
+
+
+def test_drill_backup_rejects_unsafe_asset_name():
+    from backend.services.grab_recovery import UnsafePathError
+    with tempfile.TemporaryDirectory() as tmp:
+        drill = GrabRecoveryDrill(tmp)
+        with pytest.raises(UnsafePathError):
+            drill.backup({"../../evil.bin": b"payload"})
+
+
+def test_worm_store_blocks_symlink_escape():
+    from backend.services.grab_recovery import UnsafePathError
+    with tempfile.TemporaryDirectory() as tmp:
+        outside = os.path.join(tmp, "outside")
+        os.makedirs(outside)
+        root = os.path.join(tmp, "s")
+        store = WormFileStore(root)
+        # plant a symlink inside the store root that points outside it
+        link = os.path.join(store.root, "link")
+        os.symlink(outside, link)
+        with pytest.raises(UnsafePathError):
+            store.put("link/escaped.bin", b"x")   # realpath escapes root -> rejected

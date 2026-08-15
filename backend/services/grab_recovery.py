@@ -5,12 +5,12 @@ The Defensibility Index consumes ``recovery_fidelity`` — "the proportion of
 recovery points passing all four GRAB validation stages". Until now that number
 was supplied as a literal; the four stages did not exist as executable code and
 no recovery was actually performed. This module implements the drill so the
-fidelity figure is *measured*, not asserted.
+fidelity figure is *measured* on a controlled bench, not asserted.
 
 The drill, end to end:
 
   1. Back up a set of protected assets to an immutable, write-once store
-     (compliance-mode Object Lock semantics: locked objects cannot be modified
+     (compliance-mode Object Lock *semantics*: locked objects cannot be modified
      or deleted until their retention expires).
   2. Simulate a ransomware event: the *live* working copies are encrypted /
      mangled, and the attacker also attempts to tamper with the backup store.
@@ -24,20 +24,36 @@ The four GRAB validation stages
   * integrity     — restored bytes hash-match the manifest recorded at backup
   * completeness  — every expected recovery point is present in the clean room
   * isolation     — the clean room is disjoint from the compromised live path
-                    (no attacker-controlled bytes leaked into recovery)
-  * immutability  — the backup object was provably unmodified: the store
-                    rejected the attacker's tamper attempt during retention
+  * immutability  — the store rejected the attacker's tamper attempt
 
-The immutable store here is filesystem-backed so the drill runs anywhere with no
-external services. ``backend/utils/minio_client.py`` provides the production
-equivalent (MinIO Object Lock); this module intentionally depends on neither the
-web framework nor the database so it is runnable and testable standalone.
+Scope and limitations (why this is a *simulation*, not production recovery)
+--------------------------------------------------------------------------
+This is a deterministic drill, not a production recovery system. It intentionally
+does **not** provide, and must not be presented as providing:
+
+  * real air-gapped / network-isolated recovery infrastructure;
+  * MinIO Object Lock validation against a live server (the WORM guarantee here
+    is modelled with filesystem permissions + in-process retention state, which
+    is **lost on restart** and is **not** compliance-grade immutability);
+  * malware / IOC scanning of recovery points;
+  * ML-assisted or risk-ranked clean recovery-point selection across multiple
+    restore points;
+  * recovery certification, production cutover controls, or adapter-backed
+    recovery operations.
+
+Those are tracked as future work. ``backend/utils/minio_client.py`` provides the
+production Object Lock path; wiring the drill to a live locked bucket, IOC
+scanning, and restore-point ranking are the remaining acceptance criteria for a
+full DRRA-083. This module depends on neither the web framework nor the database
+so it is runnable and testable standalone.
 """
 
 from __future__ import annotations
 
 import hashlib
+import ntpath
 import os
+import re
 import shutil
 import stat
 from dataclasses import dataclass, field
@@ -52,18 +68,48 @@ class ImmutabilityError(RuntimeError):
     """Raised when a locked object is modified or deleted during retention."""
 
 
+class UnsafePathError(ValueError):
+    """Raised when an asset name would escape its intended storage root."""
+
+
+def _safe_member(root: str, name: str) -> str:
+    """Resolve ``name`` beneath ``root``, rejecting anything that could escape.
+
+    Guards against absolute paths, Windows drive-prefixed paths, ``..``
+    traversal, empty names, and symlink escape (via realpath containment)."""
+    if name is None or not str(name).strip():
+        raise UnsafePathError("empty asset name")
+    name = str(name)
+    # absolute (POSIX or Windows) or drive-letter prefixed (e.g. C:\, \\server)
+    if os.path.isabs(name) or ntpath.isabs(name) or name.startswith(("/", "\\")):
+        raise UnsafePathError(f"absolute path not allowed: {name!r}")
+    if re.match(r"^[A-Za-z]:", name):
+        raise UnsafePathError(f"drive-prefixed path not allowed: {name!r}")
+    # explicit parent-traversal components
+    if any(part == ".." for part in re.split(r"[\\/]+", name)):
+        raise UnsafePathError(f"parent traversal not allowed: {name!r}")
+    root_real = os.path.realpath(root)
+    dest = os.path.realpath(os.path.join(root_real, name))
+    if dest != root_real and os.path.commonpath([dest, root_real]) != root_real:
+        raise UnsafePathError(f"path escapes storage root: {name!r}")
+    return dest
+
+
 class WormFileStore:
     """A minimal write-once-read-many store with compliance-mode locking.
 
     Models the guarantee DRRA relies on from MinIO Object Lock: once written
     with a retention period, an object cannot be overwritten or deleted until
-    that period elapses. Here retention is expressed as a monotonically counted
-    "clock" the caller advances, so tests are deterministic (no wall-clock).
+    that period elapses. Retention is a monotonically counted "clock" the caller
+    advances, so tests are deterministic (no wall-clock).
+
+    NOTE: retention state lives in process memory and is lost on restart; this is
+    a bench model, not compliance-grade immutability (see module docstring).
     """
 
     def __init__(self, root: str) -> None:
-        self.root = root
-        os.makedirs(root, exist_ok=True)
+        self.root = os.path.realpath(root)
+        os.makedirs(self.root, exist_ok=True)
         self._locked_until: Dict[str, int] = {}
         self._clock = 0
 
@@ -71,7 +117,7 @@ class WormFileStore:
         self._clock += n
 
     def put(self, name: str, data: bytes, retention: int = 10) -> str:
-        path = os.path.join(self.root, name)
+        path = _safe_member(self.root, name)
         if name in self._locked_until and self._clock < self._locked_until[name]:
             raise ImmutabilityError(f"object '{name}' is locked (WORM retention)")
         os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -88,16 +134,16 @@ class WormFileStore:
         return path
 
     def get(self, name: str) -> bytes:
-        with open(os.path.join(self.root, name), "rb") as f:
+        with open(_safe_member(self.root, name), "rb") as f:
             return f.read()
 
     def names(self) -> List[str]:
         return sorted(self._locked_until)
 
     def delete(self, name: str) -> None:
+        path = _safe_member(self.root, name)
         if name in self._locked_until and self._clock < self._locked_until[name]:
             raise ImmutabilityError(f"object '{name}' is locked (WORM retention)")
-        path = os.path.join(self.root, name)
         if os.path.exists(path):
             os.chmod(path, stat.S_IWUSR | stat.S_IRUSR)
             os.remove(path)
@@ -151,8 +197,8 @@ class GrabRecoveryDrill:
 
     def __init__(self, workdir: str) -> None:
         self.workdir = workdir
-        self.live_dir = os.path.join(workdir, "live")       # compromised at attack time
-        self.clean_room = os.path.join(workdir, "clean_room")  # isolated recovery target
+        self.live_dir = os.path.realpath(os.path.join(workdir, "live"))
+        self.clean_room = os.path.realpath(os.path.join(workdir, "clean_room"))
         self.store = WormFileStore(os.path.join(workdir, "immutable"))
         os.makedirs(self.live_dir, exist_ok=True)
         self._manifest: Dict[str, str] = {}  # name -> sha256 at backup time
@@ -160,7 +206,7 @@ class GrabRecoveryDrill:
     # -- stage 1: back up protected assets to the immutable store -------------
     def backup(self, assets: Dict[str, bytes], retention: int = 100) -> None:
         for name, data in assets.items():
-            live_path = os.path.join(self.live_dir, name)
+            live_path = _safe_member(self.live_dir, name)   # validate before any write
             os.makedirs(os.path.dirname(live_path), exist_ok=True)
             with open(live_path, "wb") as f:
                 f.write(data)
@@ -173,8 +219,7 @@ class GrabRecoveryDrill:
 
         Returns True iff the immutable store BLOCKED every tamper attempt."""
         for name in list(self._manifest):
-            # live copy is destroyed (as ransomware would)
-            with open(os.path.join(self.live_dir, name), "wb") as f:
+            with open(_safe_member(self.live_dir, name), "wb") as f:
                 f.write(b"ENCRYPTED_BY_RANSOMWARE")
         blocked = True
         for name in self.store.names():
@@ -196,7 +241,7 @@ class GrabRecoveryDrill:
             shutil.rmtree(self.clean_room)
         os.makedirs(self.clean_room, exist_ok=True)
         for name in self.store.names():
-            dst = os.path.join(self.clean_room, name)
+            dst = _safe_member(self.clean_room, name)
             os.makedirs(os.path.dirname(dst), exist_ok=True)
             with open(dst, "wb") as f:
                 f.write(self.store.get(name))
@@ -210,7 +255,7 @@ class GrabRecoveryDrill:
 
         for name, expected_hash in self._manifest.items():
             res = StageResult()
-            restored_path = os.path.join(self.clean_room, name)
+            restored_path = _safe_member(self.clean_room, name)
 
             # completeness: the recovery point exists in the clean room
             res.completeness = os.path.exists(restored_path)
