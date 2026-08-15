@@ -29,7 +29,7 @@ as such wherever reported · **Future** = not yet built.
 | False-positive rate (corrected: NOT 0%) | Implemented (measured) | `scripts/run_fpr_eval.py`, `tests/test_fpr_eval.py` (DRRA-079/080): measured on held-out benign workloads with a Wilson 95% CI; the prior "0% FPR" figure came from an adversarial-only replay with no benign denominator and is superseded. Figures now plot the measured value, not 0 |
 | Defensibility Index is the "first / formal" resilience metric | Future | Requires independent literature review + construct validation before any priority claim (DRRA-045/049) |
 | Near-linear enterprise-scale scalability | Future | Complexity analysis only; measured scale/soak = Future (DRRA-055) |
-| 10-VM enterprise lab | Future | Docker Compose present; reproducible provisioning = Future (DRRA-077) |
+| 10-VM enterprise lab (reproducible definition) | Partial | `lab/lab_manifest.json`, `scripts/validate_lab.py`, `tests/test_lab_provisioning.py` (DRRA-077): pinned control-plane images + declarative endpoint tier whose scenarios map to fetchable OTRF captures, validated for reproducibility; standing up the live VMs and collecting fresh telemetry = Future (external evidence) |
 | Rust watcher forwards real filesystem events | Implemented | `watchers/src/lib.rs`; `cargo test` |
 
 ## Rule

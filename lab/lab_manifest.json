@@ -1,0 +1,54 @@
+{
+  "version": "1.0",
+  "description": "Reproducible DRRA evaluation-lab topology. The control plane is provisioned by docker-compose.yml (runnable here). The endpoint tier describes the victim hosts that generate attack telemetry; live VM provisioning is external evidence (Future), but the recipe is pinned and every host's scenarios map to the OTRF datasets DRRA already ingests (DRRA-076), so the same behaviour can be replayed offline today.",
+  "control_plane": {
+    "provisioner": "docker-compose",
+    "compose_file": "docker-compose.yml",
+    "services": [
+      "minio",
+      "postgres",
+      "redis",
+      "kafka",
+      "zookeeper",
+      "prometheus",
+      "grafana",
+      "backend",
+      "dashboard",
+      "watcher"
+    ]
+  },
+  "endpoint_tier": {
+    "provisioner": "vagrant",
+    "note": "Windows victim hosts. Boxes and versions are pinned for reproducibility. Standing up the live VMs and collecting fresh telemetry is external evidence and remains Future (DRRA-077); the offline replay of each host's scenarios against pinned OTRF captures is available now.",
+    "hosts": [
+      {
+        "id": "win-workstation-01",
+        "role": "workstation",
+        "box": "gusztavvargadr/windows-10",
+        "box_version": "2102.0.2404",
+        "scenarios": ["lsass_dump_comsvcs", "lsass_dumpert"]
+      },
+      {
+        "id": "win-fileserver-01",
+        "role": "file_server",
+        "box": "gusztavvargadr/windows-server",
+        "box_version": "2019.0.2404",
+        "scenarios": ["smb_copy_lateral"]
+      },
+      {
+        "id": "win-dc-01",
+        "role": "domain_controller",
+        "box": "gusztavvargadr/windows-server",
+        "box_version": "2019.0.2404",
+        "scenarios": ["wmi_lateral", "dcsync"]
+      }
+    ]
+  },
+  "attack_scenarios": [
+    {"id": "lsass_dump_comsvcs", "dataset": "lsass_dump_comsvcs", "attack": "T1003.001", "iob": "privilege_escalation"},
+    {"id": "lsass_dumpert", "dataset": "lsass_dumpert", "attack": "T1003.001", "iob": "privilege_escalation"},
+    {"id": "smb_copy_lateral", "dataset": "smb_copy_lateral", "attack": "T1021.002", "iob": "lateral_movement"},
+    {"id": "wmi_lateral", "dataset": "wmi_lateral", "attack": "T1047", "iob": "lateral_movement"},
+    {"id": "dcsync", "dataset": "dcsync", "attack": "T1003.006", "iob": "privilege_escalation"}
+  ]
+}
