@@ -113,3 +113,6 @@ results/
 # Rust build artifacts
 target/
 watchers/target/
+
+# Downloaded datasets (fetch via scripts/fetch_datasets.py)
+data/otrf/

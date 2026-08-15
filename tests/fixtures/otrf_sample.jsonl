@@ -1,0 +1,11 @@
+{"EventID": 11, "Channel": "Microsoft-Windows-Sysmon/Operational", "Hostname": "WORKSTATION5", "TimeCreated": "2020-10-18 07:50:00.000", "Image": "C:\\ransom.exe", "TargetFilename": "C:\\Users\\a\\1.docx.locked"}
+{"EventID": 11, "Channel": "Microsoft-Windows-Sysmon/Operational", "Hostname": "WORKSTATION5", "TimeCreated": "2020-10-18 07:50:00.500", "Image": "C:\\ransom.exe", "TargetFilename": "C:\\Users\\a\\2.docx.locked"}
+{"EventID": 23, "Channel": "Microsoft-Windows-Sysmon/Operational", "Hostname": "WORKSTATION5", "TimeCreated": "2020-10-18 07:50:01.000", "Image": "C:\\ransom.exe", "TargetFilename": "C:\\Users\\a\\3.docx"}
+{"EventID": 4624, "Channel": "Security", "Hostname": "WORKSTATION5", "TimeCreated": "2020-10-18 07:50:01.200", "LogonType": "3", "IpAddress": "10.0.0.9"}
+{"EventID": 4648, "Channel": "Security", "Hostname": "WORKSTATION5", "TimeCreated": "2020-10-18 07:50:01.400"}
+{"EventID": 3, "Channel": "Microsoft-Windows-Sysmon/Operational", "Hostname": "WORKSTATION5", "TimeCreated": "2020-10-18 07:50:01.600", "DestinationPort": "445", "Image": "C:\\ransom.exe"}
+{"EventID": 4672, "Channel": "Security", "Hostname": "WORKSTATION5", "TimeCreated": "2020-10-18 07:50:02.000", "SubjectUserName": "admin"}
+{"EventID": 10, "Channel": "Microsoft-Windows-Sysmon/Operational", "Hostname": "WORKSTATION5", "TimeCreated": "2020-10-18 07:50:02.200", "TargetImage": "C:\\Windows\\System32\\lsass.exe", "SourceImage": "C:\\ransom.exe"}
+{"EventID": 4688, "Channel": "Security", "Hostname": "WORKSTATION5", "TimeCreated": "2020-10-18 07:50:03.000", "CommandLine": "vssadmin.exe delete shadows /all /quiet"}
+{"EventID": 4688, "Channel": "Security", "Hostname": "WORKSTATION5", "TimeCreated": "2020-10-18 07:50:03.500", "CommandLine": "wmic shadowcopy delete"}
+{"EventID": 4634, "Channel": "Security", "Hostname": "WORKSTATION5", "TimeCreated": "2020-10-18 07:50:04.000"}
