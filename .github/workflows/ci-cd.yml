@@ -17,8 +17,11 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  # Detection-quality gate (DRRA-086): budgets on the held-out benign set.
-  FPR_BUDGET: "0.45"        # max acceptable benign false-positive rate
+  # Detection-quality gate (DRRA-086). NOTE: this is a REGRESSION CEILING on the
+  # *synthetic* held-out set, not an industry-ready target. Measured FPR is ~0.33;
+  # the ceiling is set with headroom and MUST be ratcheted downward as the detector
+  # improves and real-endpoint evaluation replaces the synthetic proxy (DRRA-079).
+  FPR_BUDGET: "0.40"        # regression ceiling on benign FPR (ratchet down)
   RECALL_FLOOR: "0.90"      # min acceptable recall on ransomware windows
   # Coverage gate (DRRA-085 quality gate): floor to ratchet upward over time.
   COV_MIN: "40"
@@ -109,16 +112,16 @@ jobs:
         PY
 
   # ---------------------------------------------------------------- quality gate: claim integrity
-  claim-integrity-gate:
+  evidence-path-gate:
     runs-on: ubuntu-latest
-    name: Claim-Integrity Gate (DRRA-087)
+    name: Evidence-Path Gate (DRRA-087)
     steps:
     - uses: actions/checkout@v4
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.11'
-    - name: Verify the traceability matrix is present and self-consistent
+    - name: Verify every Implemented claim cites real, non-empty evidence
       run: python scripts/check_claim_integrity.py
 
   test-watcher:
@@ -166,7 +169,7 @@ jobs:
       security-events: write
     steps:
     - uses: actions/checkout@v4
-    - name: Run Trivy vulnerability scanner
+    - name: Run Trivy (SARIF report for code scanning)
       uses: aquasecurity/trivy-action@master
       with:
         scan-type: 'fs'
@@ -178,20 +181,38 @@ jobs:
       with:
         sarif_file: 'trivy-results.sarif'
       continue-on-error: true
+    # Vulnerability policy (DRRA finding 9): FIXED Critical/High vulnerabilities.
+    # STAGED enforcement — this step reports policy violations but does not yet
+    # hard-block the merge (continue-on-error), because the pinned ML dependency
+    # stack (e.g. tensorflow 2.14) carries fixed CVEs whose upgrade is a separate
+    # workstream. Flip continue-on-error to false once those are triaged (and add
+    # accepted exceptions to .trivyignore). Tracked as Partial in CLAIM_TRACEABILITY.
+    # Documented exception: unfixed vulnerabilities never block (ignore-unfixed).
+    - name: Vulnerability policy — fixed Critical/High (staged, reports only)
+      continue-on-error: true
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'table'
+        severity: 'CRITICAL,HIGH'
+        ignore-unfixed: true
+        trivyignores: '.trivyignore'
+        exit-code: '1'
 
   # ---------------------------------------------------------------- aggregate gate
   quality-gates:
     runs-on: ubuntu-latest
     name: Quality Gates
     if: always()
-    needs: [test-backend, detection-quality-gate, claim-integrity-gate, test-watcher, build-dashboard, security-scan]
+    needs: [test-backend, detection-quality-gate, evidence-path-gate, test-watcher, build-dashboard, security-scan]
     steps:
     - name: Require all gates to pass
       run: |
         declare -A R=(
           [tests]="${{ needs.test-backend.result }}"
           [detection-SLO]="${{ needs.detection-quality-gate.result }}"
-          [claim-integrity]="${{ needs.claim-integrity-gate.result }}"
+          [evidence-path]="${{ needs.evidence-path-gate.result }}"
           [rust-watcher]="${{ needs.test-watcher.result }}"
           [dashboard]="${{ needs.build-dashboard.result }}"
           [security]="${{ needs.security-scan.result }}"

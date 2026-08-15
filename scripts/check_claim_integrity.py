@@ -1,16 +1,21 @@
 #!/usr/bin/env python3
 """
-DRRA-087 — Claim-integrity gate.
+DRRA-087 — Evidence-path gate for the traceability matrix.
 
 Turns the capability→evidence traceability matrix (docs/CLAIM_TRACEABILITY.md)
-from a document into an enforced control: every capability marked **Implemented**
-must cite evidence files that actually exist in the repository. A row that claims
-"Implemented" while pointing at a missing file fails the build, so a measured
-claim can never drift away from its supporting artifact.
+from a document into an enforced control. It does NOT judge whether the evidence
+is *sufficient* (that is human review); it enforces that every **Implemented**
+claim points at real, plausibly-substantive artifacts, so a claim cannot silently
+drift away from code.
 
-Checks:
+Checks, for every row whose status starts with "Implemented":
   * the matrix file exists and contains the status-policy section;
-  * for every Implemented row, all file paths cited in its Evidence cell exist.
+  * all committed file paths cited in the Evidence cell exist (generated outputs
+    under results/ are exempt — see GENERATED_PREFIXES);
+  * the row does not simultaneously say Implemented and cite "future"/"planned"/
+    "TODO" (a contradictory status);
+  * each cited test file actually contains a test definition (a Python `def test`
+    or a Rust `#[test]`), so an Implemented claim cannot cite an empty test file.
 
 Exit non-zero on any violation.
 
@@ -36,6 +41,13 @@ PATH_RE = re.compile(r"[\w./-]+\.(?:py|rs|md|json|yaml|yml|toml)")
 GENERATED_PREFIXES = ("results/",)
 
 
+def _read(path: str) -> str:
+    try:
+        return open(path, encoding="utf-8", errors="replace").read()
+    except OSError:
+        return ""
+
+
 def main() -> int:
     if not os.path.exists(MATRIX):
         print(f"::error::traceability matrix missing: {MATRIX}")
@@ -59,6 +71,10 @@ def main() -> int:
         if not status.lower().startswith("implemented"):
             continue
         implemented_rows += 1
+        # contradictory status: Implemented but evidence talks about future work
+        if re.search(r"\b(future|planned|TODO|not yet)\b", evidence, re.I):
+            print(f"::error::row {cells[0]!r} is Implemented but cites future/planned work")
+            violations += 1
         # only require committed source evidence, not generated outputs
         paths = [p for p in PATH_RE.findall(evidence)
                  if not p.startswith(GENERATED_PREFIXES)]
@@ -67,15 +83,26 @@ def main() -> int:
             violations += 1
             continue
         for rel in paths:
-            if not os.path.exists(os.path.join(REPO, rel)):
+            full = os.path.join(REPO, rel)
+            if not os.path.exists(full):
                 print(f"::error::Implemented row {cells[0]!r} cites missing file: {rel}")
+                violations += 1
+                continue
+            # a cited test file must actually contain a test
+            base = os.path.basename(rel)
+            if rel.endswith(".py") and (base.startswith("test_") or "/tests/" in "/" + rel):
+                if "def test" not in _read(full):
+                    print(f"::error::row {cells[0]!r} cites test file with no test: {rel}")
+                    violations += 1
+            elif rel.endswith(".rs") and "test" in base and "#[test]" not in _read(full):
+                print(f"::error::row {cells[0]!r} cites Rust test file with no #[test]: {rel}")
                 violations += 1
 
     print(f"Checked {implemented_rows} Implemented rows; {violations} violation(s).")
     if violations:
-        print("::error::claim-integrity gate failed — see violations above")
+        print("::error::evidence-path gate failed — see violations above")
         return 1
-    print("Claim-integrity gate passed.")
+    print("Evidence-path gate passed.")
     return 0
 
 
