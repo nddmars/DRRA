@@ -158,9 +158,15 @@ def run_leakfree(cycles: int, seed: int = 99):
     evaluation. Ensemble FPR is measured on the held-out set every cycle, giving
     an honest convergence curve.
     """
+    import hashlib
+    import json as _json
+
     rng_eval = random.Random(f"eval-{seed}")
     heldout = benign_batch(200, rng_eval)          # fixed, never trained on
     heldout_pos = ransomware_batch(100, rng_eval)  # fixed positives for recall
+    heldout_fingerprint = hashlib.sha256(
+        _json.dumps([heldout, heldout_pos], sort_keys=True).encode()
+    ).hexdigest()
 
     primary = VigilAnomalyModel().train(_ml._synthetic_benign_baseline())
     benign_train = _ml._synthetic_benign_baseline(300)
@@ -188,6 +194,7 @@ def run_leakfree(cycles: int, seed: int = 99):
         "cycles": cycles,
         "eval_is_heldout": True,
         "n_heldout_benign": len(heldout),
+        "heldout_fingerprint": heldout_fingerprint,
         "per_cycle": per_cycle,
         "summary": {
             "initial_heldout_fpr": per_cycle[0]["heldout_fpr"],

@@ -56,4 +56,9 @@ def test_leakfree_eval_set_is_fixed():
     fb = _load("wsg_fb_lf2", "scripts/run_feedback_experiment.py")
     a = fb.run_leakfree(cycles=3, seed=7)
     b = fb.run_leakfree(cycles=3, seed=7)
-    assert a["per_cycle"] == b["per_cycle"]         # deterministic, fixed held-out set
+    # The held-out evaluation set is the DRRA-080 leakage-free invariant: it is
+    # generated once from a fixed seed and never trained on, so its fingerprint
+    # must be identical run-to-run regardless of the secondary-classifier backend
+    # (the trained model itself may be nondeterministic under TensorFlow).
+    assert a["heldout_fingerprint"] == b["heldout_fingerprint"]
+    assert a["n_heldout_benign"] == b["n_heldout_benign"]
