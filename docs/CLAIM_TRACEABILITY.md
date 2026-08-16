@@ -39,6 +39,8 @@ as such wherever reported · **Future** = not yet built.
 | Full-stack vuln scanning (frontend npm, container image, OS, pinned actions) | Future | The frontend lockfile's transitive CVEs are reported (SARIF) but not yet blocking; stronger gate = `npm audit`, a scan of the built image, a resolved `pip-audit` lockfile, and pinning third-party Actions by commit SHA (DRRA finding 9 follow-up) |
 | Detection-quality SLO enforced as a CI gate | Implemented | `.github/workflows/ci-cd.yml` detection-quality-gate + `scripts/run_fpr_eval.py` (DRRA-086): FPR budget + recall floor |
 | Claim-integrity enforced (every Implemented row's evidence exists) | Implemented | `scripts/check_claim_integrity.py` (DRRA-087); runs as a CI gate |
+| Versioned system threat model (STRIDE; ransomware + insider + supply-chain) | Implemented | `docs/THREAT_MODEL.md` (DRRA-001): versioned threat model where each threat traces to a Wave-2 requirement and carries an explicit status; residual-risk posture stated honestly (most controls open) |
+| Canonical incident-event schema (single versioned envelope + watcher adapter, contract-tested) | Implemented | `schemas/incident_event.schema.json`, `backend/models/incident_event.py`, `tests/test_incident_event_schema.py` (DRRA-002): published JSON Schema and runtime pydantic model kept in lockstep by a contract test; the Rust-watcher adapter maps a real producer payload onto the envelope and round-trips losslessly. Migrating the remaining producers/consumers onto the envelope is tracked as its own work |
 
 ## Rule
 No performance number may be stated as measured unless its row above is
