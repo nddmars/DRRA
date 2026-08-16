@@ -1,8 +1,28 @@
-# Accepted vulnerability exceptions (DRRA finding 9 — documented exception process).
-# Format: one CVE id per line, with a justification comment and a review date.
-# The vulnerability policy step blocks on FIXED Critical/High findings NOT listed
-# here. Enforcement is currently STAGED (reports only) until the pinned ML
-# dependency stack (tensorflow/numpy/pandas) is upgraded in a dedicated workstream.
+# Trivy accepted-exception list (DRRA finding 9 — documented exception process).
 #
-# Example:
-# CVE-2023-XXXXX  # accepted until 2026-Q4: no exploit path in our usage; upstream fix requires tf>=2.15
+# ENFORCEMENT: BLOCKING. The "Vulnerability policy" CI step fails the build on
+# FIXED Critical/High findings in the repository dependency manifests that are
+# NOT listed below. Unfixed vulnerabilities never block (ignore-unfixed) until an
+# upstream fix exists; they are tracked via the SARIF report in GitHub code
+# scanning.
+#
+# SCOPE: this gate scans repository dependency manifests (requirements.txt, etc.)
+# via `trivy fs`. It does NOT yet cover the built container image, OS packages,
+# runtime-installed libraries, frontend transitive packages, or Rust crates —
+# those are separate scanners (see CLAIM_TRACEABILITY.md, "stronger gate").
+#
+# TO ACCEPT AN EXCEPTION, add one CVE id per line (its own line — do not rely on
+# inline trailing comments), each with a preceding comment block that records:
+#   Justification : why the risk is acceptable / not reachable in our usage
+#   Owner         : who accepted it
+#   Approved-by   : reviewer who signed off
+#   Review-by     : expiration date (YYYY-MM-DD) after which it must be re-checked
+#
+# Example (commented out — not an active exception):
+# Justification: not reachable; the vulnerable codepath is unused in DRRA.
+# Owner: Surya Nalluri
+# Approved-by: <reviewer>
+# Review-by: 2026-12-31
+# CVE-0000-00000
+#
+# --- active exceptions below (none currently) ---
