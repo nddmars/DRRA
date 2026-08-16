@@ -6,10 +6,11 @@
 # upstream fix exists; they are tracked via the SARIF report in GitHub code
 # scanning.
 #
-# SCOPE: this gate scans repository dependency manifests (requirements.txt, etc.)
-# via `trivy fs`. It does NOT yet cover the built container image, OS packages,
-# runtime-installed libraries, frontend transitive packages, or Rust crates —
-# those are separate scanners (see CLAIM_TRACEABILITY.md, "stronger gate").
+# SCOPE: this gate scans the Python dependency manifest (requirements.txt) and
+# the Rust crate lockfile (watchers/Cargo.lock) via `trivy fs`. It EXCLUDES the
+# frontend lockfile (dashboard/ is skipped) and does NOT cover the built
+# container image, OS packages, or runtime-installed libraries — those are
+# separate scanners (see CLAIM_TRACEABILITY.md, "Full-stack vuln scanning").
 #
 # TO ACCEPT AN EXCEPTION, add one CVE id per line (its own line — do not rely on
 # inline trailing comments), each with a preceding comment block that records:
