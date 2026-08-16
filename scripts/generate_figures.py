@@ -19,6 +19,7 @@ placeholder. Run: python scripts/generate_figures.py
 from __future__ import annotations
 
 import importlib.util
+import json
 import os
 import sys
 
@@ -47,13 +48,85 @@ def _load(name, rel):
 di_mod = _load("wsg_defensibility", "backend/services/defensibility.py")
 feedback = _load("wsg_feedback", "scripts/run_feedback_experiment.py")
 fpr_eval = _load("wsg_fpr_eval_fig", "scripts/run_fpr_eval.py")
+experiment = _load("wsg_experiment_fig", "scripts/run_experiment.py")
 DefensibilityIndex = di_mod.DefensibilityIndex
 
+# WSG operating point is loaded from MEASURED experiment output (never from
+# hard-coded constants). These control that measurement.
+WSG_CONDITION = "A_change_healthcare"
+_FIG_SEED = 1234
+_FIG_REPS = 30
+_MEASURED = None
 
-def _measured_wsg_fpr_pct():
-    """Measured WSG false-positive rate (%) on held-out benign workloads —
-    replaces the former hard-coded 0.0 so no figure states an unmeasured FPR."""
-    return round(fpr_eval.evaluate(n_benign=400, n_pos=200)["fpr"] * 100, 1)
+
+def _sha256_file(path):
+    import hashlib
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def measured_wsg():
+    """Load the WSG operating point from MEASURED experiment output.
+
+    Runs the seeded synthetic-scenario experiment, extracts the WSG condition's
+    measured mean MTTD/MTTC/APCR/recovery, archives the results file, and writes
+    a provenance manifest (source + SHA-256). Raises if the measurement is
+    missing — figures NEVER silently fall back to constants (review finding).
+    Comparator columns remain illustrative."""
+    global _MEASURED
+    if _MEASURED is not None:
+        return _MEASURED
+
+    results = experiment.run_experiment(_FIG_REPS, _FIG_SEED)
+    conds = results.get("conditions", {})
+    if WSG_CONDITION not in conds:
+        raise RuntimeError(f"measured WSG condition {WSG_CONDITION!r} missing — cannot render figures")
+    c = conds[WSG_CONDITION]
+    for k in ("mttd_seconds", "mttc_seconds", "apcr", "recovery_fidelity"):
+        if c.get(k, {}).get("n", 0) == 0:
+            raise RuntimeError(f"measured WSG metric {k!r} has no observations — cannot render figures")
+
+    wsg = {
+        "mttd": round(c["mttd_seconds"]["mean"], 3),
+        "mttc": round(c["mttc_seconds"]["mean"], 3),
+        "apcr": round(c["apcr"]["mean"], 4),
+        "rf_pct": round(c["recovery_fidelity"]["mean"] * 100, 2),
+        "fpr_pct": round(fpr_eval.evaluate(n_benign=400, n_pos=200)["fpr"] * 100, 1),
+    }
+
+    # archive measured results + provenance manifest
+    os.makedirs(_OUT, exist_ok=True)
+    res_path = os.path.join(_REPO, "results", "paper_metrics.json")
+    os.makedirs(os.path.dirname(res_path), exist_ok=True)
+    with open(res_path, "w") as f:
+        json.dump(results, f, indent=2, sort_keys=True)
+
+    def _git(*a):
+        try:
+            import subprocess
+            return subprocess.check_output(["git", *a], cwd=_REPO, text=True).strip()
+        except Exception:
+            return "unknown"
+
+    manifest = {
+        "generated_from": f"scripts/run_experiment.py run_experiment(reps={_FIG_REPS}, seed={_FIG_SEED})",
+        "results_file": "results/paper_metrics.json",
+        "results_sha256": _sha256_file(res_path),
+        "git_commit": _git("rev-parse", "HEAD"),
+        "model_backend": results.get("model_backend"),
+        "wsg_condition": WSG_CONDITION,
+        "wsg_operating_point": wsg,
+        "wsg_fpr_source": "scripts/run_fpr_eval.py evaluate(n_benign=400, n_pos=200)",
+        "comparators_are_illustrative": True,
+    }
+    with open(os.path.join(_OUT, "figure_manifest.json"), "w") as f:
+        json.dump(manifest, f, indent=2, sort_keys=True)
+
+    _MEASURED = wsg
+    return wsg
 
 
 def _style():
@@ -68,32 +141,38 @@ def _style():
 # --- Comparator profiles ------------------------------------------------------
 # The three comparator columns are ILLUSTRATIVE capability assumptions for
 # architecture *classes* — not measured on this bench, and excluded from any
-# superiority claim (DRRA-081). Only the WSG column is measured: its latency /
-# recovery / APCR come from the DRRA harness, and its FPR is the measured value
-# from scripts/run_fpr_eval.py (filled in at render time, not hard-coded to 0).
+# superiority claim (DRRA-081). The WSG column (index 3) is None here and is
+# filled at render time from measured_wsg() — measured experiment output, not
+# constants — with the provenance recorded in results/figures/figure_manifest.json.
 ARCHS = ["Conventional\nML detection", "SOAR-based\nautomation", "Backup-centric\nrecovery", "Proposed\nWSG"]
 PROFILE = {
-    "mttd": [12.0, 15.0, 300.0, 2.5],
-    "mttc": [900.0, 45.0, 1800.0, 7.8],
-    "rf":   [93.0, 94.5, 97.5, 100.0],
-    "fpr":  [4.8, 3.9, 4.5, None],   # WSG filled with the measured FPR at render
-    "apcr": [0.90, 0.55, 0.98, 0.46],
+    "mttd": [12.0, 15.0, 300.0, None],
+    "mttc": [900.0, 45.0, 1800.0, None],
+    "rf":   [93.0, 94.5, 97.5, None],
+    "fpr":  [4.8, 3.9, 4.5, None],
+    "apcr": [0.90, 0.55, 0.98, None],
 }
+# map PROFILE key -> measured_wsg() key
+_WSG_KEY = {"mttd": "mttd", "mttc": "mttc", "rf": "rf_pct", "fpr": "fpr_pct", "apcr": "apcr"}
+
+
+def _series(profile_key):
+    """4-element series for a metric: comparators illustrative, WSG measured."""
+    s = list(PROFILE[profile_key])
+    s[-1] = measured_wsg()[_WSG_KEY[profile_key]]
+    return s
 
 
 def _fpr_series():
-    """PROFILE['fpr'] with the WSG entry replaced by the measured FPR (%)."""
-    series = list(PROFILE["fpr"])
-    series[-1] = _measured_wsg_fpr_pct()
-    return series
+    return _series("fpr")
 
 
-def _di_row(i, fpr_series=None):
-    fpr_series = fpr_series if fpr_series is not None else _fpr_series()
+def _di_row(i, series=None):
+    series = series or {k: _series(k) for k in ("mttd", "mttc", "apcr", "rf", "fpr")}
     r = DefensibilityIndex().score(
-        mttd_seconds=PROFILE["mttd"][i], mttc_seconds=PROFILE["mttc"][i],
-        apcr=PROFILE["apcr"][i], recovery_fidelity=PROFILE["rf"][i] / 100.0,
-        false_positive_rate=fpr_series[i] / 100.0,
+        mttd_seconds=series["mttd"][i], mttc_seconds=series["mttc"][i],
+        apcr=series["apcr"][i], recovery_fidelity=series["rf"][i] / 100.0,
+        false_positive_rate=series["fpr"][i] / 100.0,
     )
     return r.defensibility_index
 
@@ -139,8 +218,8 @@ def figure3():
     import numpy as np
     x = np.arange(len(ARCHS)); w = 0.38
     fig, ax = plt.subplots(figsize=(7.5, 4.2))
-    b1 = ax.bar(x - w / 2, PROFILE["mttd"], w, label="MTTD (s)", color=C_GREEN)
-    b2 = ax.bar(x + w / 2, PROFILE["mttc"], w, label="MTTC (s)", color=C_ACCENT)
+    b1 = ax.bar(x - w / 2, _series("mttd"), w, label="MTTD (s)", color=C_GREEN)
+    b2 = ax.bar(x + w / 2, _series("mttc"), w, label="MTTC (s)", color=C_ACCENT)
     ax.set_yscale("log")
     ax.set_ylabel("Seconds (log scale)")
     ax.set_xticks(x); ax.set_xticklabels(ARCHS)
@@ -153,10 +232,10 @@ def figure3():
 
 def figure4():
     import numpy as np
-    prevention = [(1 - a) * 100 for a in PROFILE["apcr"]]
+    prevention = [(1 - a) * 100 for a in _series("apcr")]
     x = np.arange(len(ARCHS)); w = 0.38
     fig, ax = plt.subplots(figsize=(7.5, 4.2))
-    b1 = ax.bar(x - w / 2, PROFILE["rf"], w, label="Recovery fidelity (%)", color=C_GREEN)
+    b1 = ax.bar(x - w / 2, _series("rf"), w, label="Recovery fidelity (%)", color=C_GREEN)
     b2 = ax.bar(x + w / 2, prevention, w, label="Attack-path prevention (%) = 1 − APCR", color=C_WSG)
     ax.set_ylabel("Percent")
     ax.set_ylim(0, 110)
@@ -170,7 +249,7 @@ def figure4():
 
 def figure5():
     fpr_series = _fpr_series()   # WSG entry is the measured FPR, not 0
-    di = [_di_row(i, fpr_series) for i in range(len(ARCHS))]
+    di = [_di_row(i) for i in range(len(ARCHS))]   # DI from measured WSG series
     fig, (axL, axR) = plt.subplots(1, 2, figsize=(9, 4))
     b1 = axL.bar(ARCHS, fpr_series, color=_bar_colors())
     axL.set_ylabel("False-positive rate (%)"); axL.set_title("False-positive rate")
