@@ -182,14 +182,11 @@ jobs:
         sarif_file: 'trivy-results.sarif'
       continue-on-error: true
     # Vulnerability policy (DRRA finding 9): FIXED Critical/High vulnerabilities.
-    # STAGED enforcement — this step reports policy violations but does not yet
-    # hard-block the merge (continue-on-error), because the pinned ML dependency
-    # stack (e.g. tensorflow 2.14) carries fixed CVEs whose upgrade is a separate
-    # workstream. Flip continue-on-error to false once those are triaged (and add
-    # accepted exceptions to .trivyignore). Tracked as Partial in CLAIM_TRACEABILITY.
-    # Documented exception: unfixed vulnerabilities never block (ignore-unfixed).
-    - name: Vulnerability policy — fixed Critical/High (staged, reports only)
-      continue-on-error: true
+    # ENFORCED (blocking) now that the dependency stack has been upgraded. Any
+    # remaining fixed Critical/High finding must be resolved by an upgrade or an
+    # accepted, documented exception in .trivyignore. Unfixed vulnerabilities
+    # never block (ignore-unfixed) until an upstream fix exists.
+    - name: Vulnerability policy — block fixed Critical/High
       uses: aquasecurity/trivy-action@master
       with:
         scan-type: 'fs'
