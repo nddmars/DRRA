@@ -1,0 +1,8 @@
+# Accepted vulnerability exceptions (DRRA finding 9 — documented exception process).
+# Format: one CVE id per line, with a justification comment and a review date.
+# The vulnerability policy step blocks on FIXED Critical/High findings NOT listed
+# here. Enforcement is currently STAGED (reports only) until the pinned ML
+# dependency stack (tensorflow/numpy/pandas) is upgraded in a dedicated workstream.
+#
+# Example:
+# CVE-2023-XXXXX  # accepted until 2026-Q4: no exploit path in our usage; upstream fix requires tf>=2.15

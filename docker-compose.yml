@@ -3,7 +3,7 @@ version: '3.8'
 services:
   # MinIO - S3-compatible object storage with immutable locking
   minio:
-    image: minio/minio:latest
+    image: minio/minio:RELEASE.2024-01-16T16-07-38Z
     environment:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
@@ -84,7 +84,7 @@ services:
 
   # Prometheus - Metrics collection
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v2.51.0
     ports:
       - "7500:9090"
     volumes:
@@ -96,7 +96,7 @@ services:
 
   # Grafana - Visualization and monitoring
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:10.4.0
     ports:
       - "7600:3000"
     environment:

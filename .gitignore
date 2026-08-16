@@ -103,8 +103,8 @@ node_modules/
 dist/
 *.tsbuildinfo
 
-# Internal tooling files
-.claude/
+# Local temporary files
+.localtemp/
 
 # Experiment outputs
 results/
@@ -113,3 +113,6 @@ results/
 # Rust build artifacts
 target/
 watchers/target/
+
+# Downloaded datasets (fetch via scripts/fetch_datasets.py)
+data/otrf/

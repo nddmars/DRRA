@@ -350,6 +350,10 @@ class SecondaryClassifier:
             import tensorflow as tf  # noqa: F401
             from tensorflow import keras
 
+            # Deterministic training: seed Python/NumPy/TensorFlow RNGs so the
+            # secondary classifier is reproducible run-to-run (DRRA-078/080).
+            keras.utils.set_random_seed(17)
+
             model = keras.Sequential([
                 keras.layers.Input(shape=(len(FEATURES),)),
                 keras.layers.Dense(16, activation="relu"),
