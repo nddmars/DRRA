@@ -146,6 +146,10 @@ class DefensibilityResult:
     false_positive_rate: float
     recovery_fidelity: float
     sample_size: int
+    # Which business-context weighting produced this score (DRRA-048). Two DI
+    # scores are only directly comparable when these match — see di_profiles.
+    profile_id: str = "balanced"
+    profile_version: str = "1.0.0"
 
     def as_dict(self) -> Dict:
         return {
@@ -153,6 +157,7 @@ class DefensibilityResult:
             "score_0_100": self.score_0_100,
             "components": self.components.as_dict(),
             "weights": {k: round(v, 4) for k, v in self.weights.items()},
+            "profile": {"id": self.profile_id, "version": self.profile_version},
             "metrics": {
                 "mttd_seconds": round(self.mttd_seconds, 3),
                 "mttc_seconds": round(self.mttc_seconds, 3),
@@ -173,12 +178,33 @@ class DefensibilityIndex:
         mttc_sla_seconds: Optional[float] = None,
         detection_deadline_seconds: Optional[float] = None,
         fpr_penalty: bool = False,
+        profile_id: str = "balanced",
+        profile_version: str = "1.0.0",
     ) -> None:
         cfg_weights, cfg_sla, cfg_deadline = _load_config()
         self.weights = self._normalize_weights(weights or cfg_weights)
         self.mttc_sla = float(mttc_sla_seconds or cfg_sla)
         self.detection_deadline = float(detection_deadline_seconds or cfg_deadline)
         self.fpr_penalty = fpr_penalty
+        # Business-context weighting identity carried onto every result (DRRA-048).
+        self.profile_id = profile_id
+        self.profile_version = profile_version
+
+    @classmethod
+    def from_profile(cls, profile_id: str, version: Optional[str] = None, **kwargs) -> "DefensibilityIndex":
+        """Build a DI configured with a named, versioned weighting profile
+        (DRRA-048). The resulting scores are tagged with the profile identity so
+        they are only compared within the same profile+version.
+        """
+        from services.di_profiles import get_profile
+
+        profile = get_profile(profile_id, version)
+        return cls(
+            weights=dict(profile.weights),
+            profile_id=profile.profile_id,
+            profile_version=profile.version,
+            **kwargs,
+        )
 
     # -- component normalisation ---------------------------------------------
     @staticmethod
@@ -254,6 +280,8 @@ class DefensibilityIndex:
             false_positive_rate=false_positive_rate,
             recovery_fidelity=recovery_fidelity,
             sample_size=sample_size,
+            profile_id=self.profile_id,
+            profile_version=self.profile_version,
         )
 
     # -- aggregation over many incidents -------------------------------------
