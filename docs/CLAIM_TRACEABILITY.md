@@ -39,6 +39,7 @@ as such wherever reported · **Future** = not yet built.
 | Full-stack vuln scanning (frontend npm, container image, OS, pinned actions) | Future | The frontend lockfile's transitive CVEs are reported (SARIF) but not yet blocking; stronger gate = `npm audit`, a scan of the built image, a resolved `pip-audit` lockfile, and pinning third-party Actions by commit SHA (DRRA finding 9 follow-up) |
 | Detection-quality SLO enforced as a CI gate | Implemented | `.github/workflows/ci-cd.yml` detection-quality-gate + `scripts/run_fpr_eval.py` (DRRA-086): FPR budget + recall floor |
 | Claim-integrity enforced (every Implemented row's evidence exists) | Implemented | `scripts/check_claim_integrity.py` (DRRA-087); runs as a CI gate |
+| Explainable detection outputs (each alert cites contributing signals) | Implemented | `vigil/explain.py`, `tests/test_explain.py` (DRRA-019): turns a Detection + IoBVector into an analyst-facing explanation — each contributing signal cited in plain language with its observed value and share of total signal, ordered by the model's own ranking; benign and below-threshold cases produce honest summaries. A thin layer over `vigil/ml_model.py` that does not alter scoring |
 
 ## Rule
 No performance number may be stated as measured unless its row above is
