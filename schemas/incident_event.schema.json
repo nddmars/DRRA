@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://drra.dev/schemas/incident_event/1.0.0",
+  "title": "DRRA Canonical Incident Event",
+  "description": "The single versioned event envelope every DRRA producer emits and every consumer reads (DRRA-002). Producer-specific vocabularies (the Rust watcher's FileModificationEvent, OTRF/Sysmon telemetry, and the backend detection/telemetry models) map onto this envelope via documented adapters. See docs/EVENT_SCHEMA.md.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "event_id",
+    "occurred_at",
+    "producer",
+    "category",
+    "action",
+    "severity"
+  ],
+  "properties": {
+    "schema_version": {
+      "description": "Semantic version of this envelope. Consumers reject an event whose major version they do not understand.",
+      "type": "string",
+      "const": "1.0.0"
+    },
+    "event_id": {
+      "description": "Globally unique event identifier (UUID recommended).",
+      "type": "string",
+      "minLength": 1
+    },
+    "occurred_at": {
+      "description": "RFC 3339 timestamp of when the observed activity happened (source clock).",
+      "type": "string",
+      "format": "date-time"
+    },
+    "ingested_at": {
+      "description": "RFC 3339 timestamp of when DRRA received the event (receiver clock). Enables clock-skew accounting (DRRA-008).",
+      "type": "string",
+      "format": "date-time"
+    },
+    "producer": {
+      "description": "What emitted the event.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["component"],
+      "properties": {
+        "component": {
+          "type": "string",
+          "enum": ["watcher", "vigil", "shield", "grab", "forge", "ingest", "integration"]
+        },
+        "instance_id": { "type": "string" },
+        "version": { "type": "string" }
+      }
+    },
+    "host": {
+      "description": "Where the activity was observed.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "hostname": { "type": "string" },
+        "host_id": { "type": "string" },
+        "source": { "type": "string" }
+      }
+    },
+    "category": {
+      "description": "Coarse classification of what the event represents.",
+      "type": "string",
+      "enum": [
+        "file_activity",
+        "process",
+        "network",
+        "authentication",
+        "privilege",
+        "recovery_inhibition",
+        "detection",
+        "containment",
+        "recovery",
+        "telemetry"
+      ]
+    },
+    "action": {
+      "description": "The specific action within the category (e.g. create, modify, remove, rename, logon, process_access, contain, restore).",
+      "type": "string",
+      "minLength": 1
+    },
+    "severity": {
+      "description": "Normalised severity shared across producers.",
+      "type": "string",
+      "enum": ["info", "low", "medium", "high", "critical"]
+    },
+    "subject": {
+      "description": "The entity the action was performed on. All fields optional; populate what the producer observed.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "file_path": { "type": "string" },
+        "process_image": { "type": "string" },
+        "command_line": { "type": "string" },
+        "target_image": { "type": "string" },
+        "user": { "type": "string" },
+        "destination_port": { "type": "integer" }
+      }
+    },
+    "signals": {
+      "description": "Measured numeric signals. Keys are stable across producers so the detector and dashboard read one vocabulary.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "entropy_score": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "file_size": { "type": "integer", "minimum": 0 },
+        "confidence": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "file_rename_rate": { "type": "number", "minimum": 0.0 },
+        "lateral_movement_score": { "type": "number", "minimum": 0.0 },
+        "privilege_escalation": { "type": "number", "minimum": 0.0 },
+        "shadow_copy_deletion_rate": { "type": "number", "minimum": 0.0 }
+      }
+    },
+    "labels": {
+      "description": "Free-form string key/value tags (e.g. tenant, campaign, rule id). Never used for authorization decisions.",
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "raw_ref": {
+      "description": "Pointer back to the untransformed source event for forensics and chain of custody (DRRA-043).",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "source_schema": { "type": "string" },
+        "source_event_id": { "type": "string" }
+      }
+    }
+  }
+}
