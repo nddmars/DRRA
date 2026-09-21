@@ -39,6 +39,7 @@ as such wherever reported · **Future** = not yet built.
 | Full-stack vuln scanning (frontend npm, container image, OS, pinned actions) | Future | The frontend lockfile's transitive CVEs are reported (SARIF) but not yet blocking; stronger gate = `npm audit`, a scan of the built image, a resolved `pip-audit` lockfile, and pinning third-party Actions by commit SHA (DRRA finding 9 follow-up) |
 | Detection-quality SLO enforced as a CI gate | Implemented | `.github/workflows/ci-cd.yml` detection-quality-gate + `scripts/run_fpr_eval.py` (DRRA-086): FPR budget + recall floor |
 | Claim-integrity enforced (every Implemented row's evidence exists) | Implemented | `scripts/check_claim_integrity.py` (DRRA-087); runs as a CI gate |
+| DI weighting profiles by business context (versioned, comparability-preserving) | Implemented | `backend/services/di_profiles.py`, `backend/services/defensibility.py` (`from_profile`), `tests/test_di_profiles.py` (DRRA-048): named, semantically-versioned weight sets (balanced / detection-critical / recovery-critical / prevention-critical / regulated-data) selectable via `DI_PROFILE`; the DI keeps the same component definitions and [0,1] scale under every profile and each score is tagged with its `(profile_id, version)` so scores are only compared within a profile. Wiring runtime profile selection into the dashboard endpoint is a separate step |
 
 ## Rule
 No performance number may be stated as measured unless its row above is
