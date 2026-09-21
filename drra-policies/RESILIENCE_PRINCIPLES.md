@@ -1,6 +1,6 @@
 # Resilience Principles - DRRA Architectural Foundation
 
-Six core principles guide Resilience Forge architecture and response decisions.
+Six core principles guide DRRA architecture and response decisions.
 
 ## 1. Immutability First
 

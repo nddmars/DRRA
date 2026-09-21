@@ -1,6 +1,6 @@
 # DRRA Policies & Rules - Complete Reference
 
-Vendor-agnostic policy definitions for Resilience Forge ransomware detection, containment, recovery, and hardening.
+Vendor-agnostic policy definitions for DRRA ransomware detection, containment, recovery, and hardening.
 
 ## Quick Navigation
 

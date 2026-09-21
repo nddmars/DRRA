@@ -7,7 +7,7 @@ description: >
   indicating bulk encryption of user data. This is the most reliable real-time signal
   that ransomware payload execution is underway.
 status: stable
-author: Resilience Forge Team
+author: Suryaprakash Nalluri
 date: 2026/03/21
 
 logsource:

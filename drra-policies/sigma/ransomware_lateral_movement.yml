@@ -2,7 +2,7 @@ title: Ransomware - Lateral Movement via Credential Reuse
 id: 34g67890-cdef-3456-gh78-901234567890
 description: Detects lateral movement patterns consistent with ransomware propagation — credential reuse over SMB/RDP/WMI, PsExec-style execution, and abnormal authentication spikes.
 status: experimental
-author: Resilience Forge Team
+author: Suryaprakash Nalluri
 date: 2026/03/23
 
 logsource:

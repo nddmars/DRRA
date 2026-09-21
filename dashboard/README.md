@@ -1,6 +1,6 @@
-# Resilience Forge Dashboard Configuration
+# DRRA Dashboard Configuration
 
-This directory contains the web dashboard for Resilience Forge.
+This directory contains the web dashboard for DRRA.
 
 ## Features
 
