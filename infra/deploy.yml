@@ -1,7 +1,7 @@
 ---
-# Ansible playbook for deploying Resilience Forge to target hosts
+# Ansible playbook for deploying DRRA to target hosts
 
-- name: "Deploy Resilience Forge (DRRA)"
+- name: "Deploy DRRA"
   hosts: ransomware_defense_hosts
   become: yes
   vars:
@@ -44,7 +44,7 @@
       args:
         creates: /usr/local/bin/docker-compose
 
-    - name: "Create Resilience Forge directories"
+    - name: "Create DRRA directories"
       file:
         path: "/opt/resilience-forge/{{ item }}"
         state: directory
@@ -54,9 +54,9 @@
         - backups
         - config
 
-    - name: "Clone Resilience Forge repository"
+    - name: "Clone DRRA repository"
       git:
-        repo: "https://github.com/yourusername/resilience-forge.git"
+        repo: "https://github.com/nddmars/DRRA.git"
         dest: "/opt/resilience-forge"
         version: main
 
@@ -114,7 +114,7 @@
     - name: "Display deployment summary"
       debug:
         msg: |
-          Resilience Forge deployed successfully!
+          DRRA deployed successfully!
           Dashboard: http://{{ ansible_host }}:3000
           API: http://{{ ansible_host }}:8000
           MinIO Console: http://{{ ansible_host }}:9001

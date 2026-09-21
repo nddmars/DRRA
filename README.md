@@ -1,8 +1,16 @@
-# Resilience Forge (DRRA)
-## Distributed Resilience & Recovery Architecture
-> *"Because damn resilient systems don't pay ransoms."*
+# DRRA — Distributed Ransomware Response Architecture
 
-**The industry standard for architecting, testing, and validating ransomware-proof ecosystems through automation and AI.**
+> Ransomware resilience you can prove: detect, contain and recover — with evidence.
+
+DRRA is an open-source reference implementation of WSG (WALL–SQUAT–GRAB), a closed-loop
+ransomware resilience framework in which detection, containment and recovery feed each other.
+
+## Background
+
+The WSG framework was presented at RSA Conference 2026 (session IMT-T09, "Beyond Prevention:
+Architecting Cyber-Resilient Defense Against Ransomware"). DRRA implements its three pillars —
+WALL (behavioural detection), SQUAT (automated containment) and GRAB (immutable, validated
+recovery) — and its Defensibility Index. A research paper describing the framework is in preparation.
 
 ## Documentation
 
@@ -33,8 +41,8 @@ Built on the **WALL-SQUAT-GRAB** framework:
 ## Quick Start
 
 ```bash
-git clone https://github.com/yourusername/resilience-forge.git
-cd resilience-forge
+git clone https://github.com/nddmars/DRRA.git
+cd DRRA
 docker-compose up -d
 ```
 
@@ -104,17 +112,14 @@ TensorFlow/Keras when available and falls back to a scikit-learn MLP, then a
 logistic heuristic. Exposed at `POST /api/v1/vigil/score`, which returns the
 stage-1 anomaly score, the stage-2 confirmation, and MITRE ATT&CK mappings.
 
-**Reproduce the simulation results** (paper Table 4) end-to-end:
+**Reproduce the simulation results** end-to-end:
 
 ```bash
 python scripts/run_experiment.py --reps 10 --out results/experiment.json
 ```
 
-This replays two multi-stage adversarial scenarios (Change Healthcare / MOVEit)
-through the real model and DI engine and prints a Markdown table with
-mean ± 95% CI for MTTD, MTTC, FPR, APCR, recovery fidelity, and DI. Nothing is
-hard-coded — MTTD and APCR emerge from the model actually scoring each
-kill-chain stage.
+Runs the multi-stage adversarial scenarios used to evaluate the Defensibility Index
+and writes the results to results/experiment.json.
 
 ## Testing
 
@@ -130,6 +135,18 @@ those services are not reachable; the core logic is fully covered offline.
 ## License
 
 MIT License — See LICENSE file for details.
+
+## Author
+
+Suryaprakash Nalluri — design and implementation.
+
+## Disclaimer
+
+DRRA is a personal research and education project. It is not affiliated with, sponsored by or
+endorsed by the author's current or former employers, and it contains no employer code, data or
+confidential information. It is provided for research and evaluation; review and harden it before
+any production use. Third-party tools named in this repository (for example Kafka, MinIO, Shuffle,
+Ansible and Google Gemini) are examples of interchangeable components, not endorsements.
 
 ## Contact & Support
 

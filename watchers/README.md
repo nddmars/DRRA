@@ -1,4 +1,4 @@
-# Rust-Based File Watchers for Resilience Forge
+# Rust-Based File Watchers for DRRA
 
 High-performance, asynchronous file system monitoring for entropy analysis and behavior tracking.
 
