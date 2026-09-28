@@ -24,6 +24,7 @@ from services.di_profiles import (  # noqa: E402
     WeightingProfile,
     active_profile_id,
     get_profile,
+    list_all_versions,
     list_profiles,
 )
 from services.defensibility import DefensibilityIndex, DEFAULT_WEIGHTS  # noqa: E402
@@ -135,3 +136,37 @@ def test_default_constructor_is_unchanged_and_tagged_balanced():
                    recovery_fidelity=0.9)
     assert res.profile_id == "balanced"
     assert res.profile_version == "1.0.0"
+
+
+def test_custom_weights_are_not_labeled_balanced():
+    # Reviewer finding #1: arbitrary caller-supplied weights must not masquerade
+    # as the paper 'balanced@1.0.0' profile.
+    di = DefensibilityIndex(weights={"detection": 0.7, "containment": 0.1,
+                                     "prevention": 0.1, "recovery": 0.1})
+    res = di.score(mttd_seconds=30.0, mttc_seconds=30.0, apcr=0.2, recovery_fidelity=0.9)
+    assert res.profile_id == "custom"
+    assert res.profile_version == "unversioned"
+    assert res.as_dict()["profile"] == {"id": "custom", "version": "unversioned"}
+
+
+def test_registered_profile_weights_are_immutable():
+    # Reviewer finding #2: a caller must not be able to mutate the global
+    # registered profile in place (which would change scores without a version bump).
+    p = get_profile("balanced")
+    with pytest.raises(TypeError):
+        p.weights["detection"] = 0.99  # type: ignore[index]
+    # Registry value is unchanged.
+    assert get_profile("balanced").weights["detection"] == DEFAULT_WEIGHTS["detection"]
+
+
+def test_registry_is_version_keyed():
+    # Reviewer finding #3: the registry must retain versions, not key by id alone.
+    p = get_profile("balanced", version="1.0.0")
+    assert p.key == "balanced@1.0.0"
+    # Every registered version is addressable and unique by (id, version).
+    keys = [(x.profile_id, x.version) for x in list_all_versions()]
+    assert len(keys) == len(set(keys))
+    assert ("balanced", "1.0.0") in keys
+    # A wrong version is a ValueError, not a silent fallback to another weighting.
+    with pytest.raises(ValueError):
+        get_profile("balanced", version="2.0.0")

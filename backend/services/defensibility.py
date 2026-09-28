@@ -178,8 +178,8 @@ class DefensibilityIndex:
         mttc_sla_seconds: Optional[float] = None,
         detection_deadline_seconds: Optional[float] = None,
         fpr_penalty: bool = False,
-        profile_id: str = "balanced",
-        profile_version: str = "1.0.0",
+        profile_id: Optional[str] = None,
+        profile_version: Optional[str] = None,
     ) -> None:
         cfg_weights, cfg_sla, cfg_deadline = _load_config()
         self.weights = self._normalize_weights(weights or cfg_weights)
@@ -187,8 +187,17 @@ class DefensibilityIndex:
         self.detection_deadline = float(detection_deadline_seconds or cfg_deadline)
         self.fpr_penalty = fpr_penalty
         # Business-context weighting identity carried onto every result (DRRA-048).
-        self.profile_id = profile_id
-        self.profile_version = profile_version
+        # Only claim the 'balanced' paper profile when the (normalized) weights
+        # actually equal it; arbitrary caller- or config-supplied weights must NOT
+        # masquerade as balanced@1.0.0. from_profile() passes an explicit identity.
+        if profile_id is not None:
+            self.profile_id = profile_id
+            self.profile_version = profile_version or "unversioned"
+        elif all(math.isclose(self.weights[k], DEFAULT_WEIGHTS[k], abs_tol=1e-9)
+                 for k in DEFAULT_WEIGHTS):
+            self.profile_id, self.profile_version = "balanced", "1.0.0"
+        else:
+            self.profile_id, self.profile_version = "custom", "unversioned"
 
     @classmethod
     def from_profile(cls, profile_id: str, version: Optional[str] = None, **kwargs) -> "DefensibilityIndex":
