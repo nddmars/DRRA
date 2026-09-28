@@ -39,6 +39,7 @@ as such wherever reported · **Future** = not yet built.
 | Full-stack vuln scanning (frontend npm, container image, OS, pinned actions) | Future | The frontend lockfile's transitive CVEs are reported (SARIF) but not yet blocking; stronger gate = `npm audit`, a scan of the built image, a resolved `pip-audit` lockfile, and pinning third-party Actions by commit SHA (DRRA finding 9 follow-up) |
 | Detection-quality SLO enforced as a CI gate | Implemented | `.github/workflows/ci-cd.yml` detection-quality-gate + `scripts/run_fpr_eval.py` (DRRA-086): FPR budget + recall floor |
 | Claim-integrity enforced (every Implemented row's evidence exists) | Implemented | `scripts/check_claim_integrity.py` (DRRA-087); runs as a CI gate |
+| Trustworthy time: monotonic timestamps + clock-skew checks | Implemented | `backend/utils/trusted_time.py`, `tests/test_trusted_time.py` (DRRA-008): a `TrustedClock` emits strictly non-decreasing timestamps across a backward wall-clock jump (tested with injected time sources), and `assess_skew` classifies source-vs-receiver skew as ok/warn/reject symmetrically. Dependency-free so watcher, backend, and scripts share one time vocabulary. Wiring it into the live event pipeline and enforcing NTP at deploy time are separate steps |
 
 ## Rule
 No performance number may be stated as measured unless its row above is
