@@ -1,6 +1,6 @@
 # OPA/Rego Policies - Infrastructure Governance
 
-Policy-as-code for Resilience Forge isolation, recovery, and immutability enforcement. Ensures safe automated responses to ransomware incidents.
+Policy-as-code for DRRA isolation, recovery, and immutability enforcement. Ensures safe automated responses to ransomware incidents.
 
 ## Policy Categories
 

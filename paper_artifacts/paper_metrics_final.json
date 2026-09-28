@@ -1,0 +1,185 @@
+{
+  "release": "v1.0-paper",
+  "commit": "(set at tag time)",
+  "seeds": {
+    "experiment": 1234,
+    "held_out_fpr": 4242,
+    "reps": 30,
+    "feedback_cycles": 10
+  },
+  "model_backend": "isolation_forest",
+  "di_definition": "canonical: DI is a weighted harmonic mean with the detection term D = (1 - MTTD/T_drrt)(1 - FPR); the false-positive rate is intrinsic. Table 5, Section 5.5, and Table 7 all use this one definition.",
+  "held_out_benign_fpr": {
+    "value": 0.325,
+    "wilson_95ci": [
+      0.281,
+      0.3724
+    ],
+    "recall": 1.0,
+    "primary_only_fpr": 0.615,
+    "n_benign": 400,
+    "n_positive": 200,
+    "note": "synthetic held-out proxy, NOT representative real-world FPR"
+  },
+  "table5": {
+    "scenario_A_change_healthcare": {
+      "mttd_seconds": {
+        "mean": 2.0312,
+        "ci95": 0.0408,
+        "n": 30
+      },
+      "mttc_seconds_modeled": {
+        "mean": 7.7388,
+        "ci95": 0.6013,
+        "n": 30
+      },
+      "apcr": {
+        "mean": 0.48,
+        "ci95": 0.0357,
+        "n": 30
+      },
+      "recovery_fidelity_modeled": {
+        "mean": 1.0,
+        "ci95": 0.0,
+        "n": 30
+      },
+      "defensibility_index": {
+        "mean": 0.6974,
+        "ci95": 0.019,
+        "n": 30
+      },
+      "defensibility_index_converged_fpr0": {
+        "mean": 0.7767,
+        "ci95": 0.0235,
+        "n": 30
+      }
+    },
+    "scenario_B_moveit": {
+      "mttd_seconds": {
+        "mean": 2.9645,
+        "ci95": 0.0673,
+        "n": 30
+      },
+      "mttc_seconds_modeled": {
+        "mean": 7.9301,
+        "ci95": 0.7037,
+        "n": 30
+      },
+      "apcr": {
+        "mean": 0.4417,
+        "ci95": 0.0385,
+        "n": 30
+      },
+      "recovery_fidelity_modeled": {
+        "mean": 1.0,
+        "ci95": 0.0,
+        "n": 30
+      },
+      "defensibility_index": {
+        "mean": 0.7136,
+        "ci95": 0.0158,
+        "n": 30
+      },
+      "defensibility_index_converged_fpr0": {
+        "mean": 0.7969,
+        "ci95": 0.0199,
+        "n": 30
+      }
+    },
+    "baseline_no_wsg": {
+      "defensibility_index": {
+        "mean": 0.0,
+        "ci95": 0.0,
+        "n": 30
+      }
+    },
+    "provenance": {
+      "mttd": "MEASURED (model detection point over templated, jittered stage timings)",
+      "mttc": "MODELED (simulation constant 8.0s +/- 3.0 jitter; not live-timed)",
+      "apcr": "MEASURED",
+      "recovery_fidelity": "MODELED (constant 1.0, intact-WORM)",
+      "defensibility_index": "COMPUTED (canonical FPR-inclusive DI at held-out FPR)"
+    }
+  },
+  "section55_feedback": {
+    "eval_is_heldout": true,
+    "per_cycle": [
+      {
+        "cycle": 1,
+        "heldout_fpr": 0.525,
+        "heldout_recall": 1.0,
+        "defensibility_index": 0.6271
+      },
+      {
+        "cycle": 2,
+        "heldout_fpr": 0.0,
+        "heldout_recall": 1.0,
+        "defensibility_index": 0.7935
+      },
+      {
+        "cycle": 3,
+        "heldout_fpr": 0.0,
+        "heldout_recall": 1.0,
+        "defensibility_index": 0.7935
+      },
+      {
+        "cycle": 4,
+        "heldout_fpr": 0.0,
+        "heldout_recall": 1.0,
+        "defensibility_index": 0.7935
+      },
+      {
+        "cycle": 5,
+        "heldout_fpr": 0.0,
+        "heldout_recall": 1.0,
+        "defensibility_index": 0.7935
+      },
+      {
+        "cycle": 6,
+        "heldout_fpr": 0.0,
+        "heldout_recall": 1.0,
+        "defensibility_index": 0.7935
+      },
+      {
+        "cycle": 7,
+        "heldout_fpr": 0.0,
+        "heldout_recall": 1.0,
+        "defensibility_index": 0.7935
+      },
+      {
+        "cycle": 8,
+        "heldout_fpr": 0.0,
+        "heldout_recall": 1.0,
+        "defensibility_index": 0.7935
+      },
+      {
+        "cycle": 9,
+        "heldout_fpr": 0.0,
+        "heldout_recall": 1.0,
+        "defensibility_index": 0.7935
+      },
+      {
+        "cycle": 10,
+        "heldout_fpr": 0.0,
+        "heldout_recall": 1.0,
+        "defensibility_index": 0.7935
+      }
+    ],
+    "summary": {
+      "initial_heldout_fpr": 0.525,
+      "final_heldout_fpr": 0.0,
+      "final_heldout_recall": 1.0,
+      "initial_di": 0.6271,
+      "final_di": 0.7935
+    }
+  },
+  "table7": {
+    "comparators_are_assumptions": true,
+    "defensibility_index": {
+      "Conventional ML detection": 0.0,
+      "SOAR-based automation": 0.4459,
+      "Backup-centric recovery": 0.0,
+      "Proposed WSG (base, held-out FPR)": 0.71
+    }
+  }
+}

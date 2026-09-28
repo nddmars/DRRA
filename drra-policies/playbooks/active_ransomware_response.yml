@@ -157,7 +157,7 @@ stages:
 metadata:
   name: Active Ransomware Response
   description: End-to-end response to active ransomware attack
-  author: Resilience Forge Team
+  author: Suryaprakash Nalluri
   version: 1.0.0
   estimated_total_time_minutes: 60
   approval_required: false

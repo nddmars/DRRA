@@ -53,7 +53,7 @@ const Dashboard = () => {
     <div className="min-h-screen bg-slate-950 text-white p-8">
       {/* Header */}
       <div className="mb-8">
-        <h1 className="text-4xl font-bold mb-2 text-red-500">🔥 Resilience Forge</h1>
+        <h1 className="text-4xl font-bold mb-2 text-red-500">🔥 DRRA</h1>
         <p className="text-slate-400">Real-time ransomware defense & resilience monitoring</p>
       </div>
 

@@ -10,7 +10,7 @@ alembic==1.13.0
 psycopg2-binary==2.9.9
 
 # Message Queue
-kafka-python==2.0.2
+kafka-python==2.3.2
 
 # ML & Detection
 scikit-learn==1.3.2

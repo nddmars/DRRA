@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Resilience Forge (DRRA) — Documentation</title>
+  <title>DRRA — Documentation</title>
   <style>
     /* ===== RESET & BASE ===== */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -452,8 +452,8 @@
   <!-- SIDEBAR -->
   <aside id="sidebar">
     <div class="sidebar-logo">
-      <div class="brand">&#x1F525; Resilience Forge</div>
-      <div class="sub">DRRA — Distributed Resilience & Recovery Architecture</div>
+      <div class="brand">&#x1F525; DRRA</div>
+      <div class="sub">DRRA — Distributed Ransomware Response Architecture</div>
       <span class="badge">CONFERENCE EDITION</span>
     </div>
     <nav id="nav">
@@ -503,8 +503,9 @@
       <!-- ========== OVERVIEW ========== -->
       <section id="overview" class="section active">
         <div class="hero">
-          <h1>Resilience Forge <span style="color:var(--muted);font-weight:400;font-size:1.2rem">(DRRA)</span></h1>
-          <p>Distributed Resilience & Recovery Architecture — The industry standard for architecting, testing, and validating ransomware-proof ecosystems through automation and AI.</p>
+          <h1>DRRA <span style="color:var(--muted);font-weight:400;font-size:1.2rem">(Distributed Ransomware Response Architecture)</span></h1>
+          <p>Ransomware resilience you can prove: detect, contain and recover — with evidence. DRRA is an open-source reference implementation of WSG (WALL–SQUAT–GRAB), a closed-loop ransomware resilience framework in which detection, containment and recovery feed each other.</p>
+          <p>The WSG framework was presented at RSA Conference 2026 (session IMT-T09, "Beyond Prevention: Architecting Cyber-Resilient Defense Against Ransomware"). A research paper describing the framework is in preparation.</p>
           <div class="pill-group">
             <span class="pill wall">&#x1F535; WALL — PREVENT</span>
             <span class="pill squat">&#x1F7E1; SQUAT — SURVIVE</span>
@@ -514,7 +515,7 @@
         </div>
 
         <h2>What is DRRA?</h2>
-        <p>Resilience Forge is an open-source <strong>"Assume Breach"</strong> laboratory that provides a controlled playground where security engineers can build, test, and validate ransomware defenses. Unlike traditional security tools that focus on prevention alone, DRRA implements the <strong>WALL-SQUAT-GRAB</strong> framework — a three-pillar approach designed to detect threats, contain their blast radius, and recover with zero data loss.</p>
+        <p>DRRA is an open-source <strong>"Assume Breach"</strong> laboratory that provides a controlled playground where security engineers can build, test, and validate ransomware defenses. Unlike traditional security tools that focus on prevention alone, DRRA implements the <strong>WALL-SQUAT-GRAB</strong> framework — a three-pillar approach designed to detect threats, contain their blast radius, and recover with zero data loss.</p>
         <p>The system is built around the concept of the <strong>Defensibility Index (DI)</strong> — a 0–100 score measuring how well your infrastructure would survive a real ransomware attack. Higher is better.</p>
 
         <h2>The WALL-SQUAT-GRAB Framework</h2>
@@ -589,7 +590,7 @@
       <!-- ========== ARCHITECTURE ========== -->
       <section id="architecture" class="section">
         <h1>Architecture</h1>
-        <p>Resilience Forge follows a distributed, defense-in-depth architecture with five core service layers communicating through event-driven patterns.</p>
+        <p>DRRA follows a distributed, defense-in-depth architecture with five core service layers communicating through event-driven patterns.</p>
 
         <h2>System Diagram</h2>
         <div class="arch-diagram">
@@ -1489,7 +1490,7 @@ logs:
       <!-- ========== QUICK START ========== -->
       <section id="quickstart" class="section">
         <h1>Quick Start</h1>
-        <p>Get Resilience Forge running in under 5 minutes using Docker Compose.</p>
+        <p>Get DRRA running in under 5 minutes using Docker Compose.</p>
 
         <h2>Prerequisites</h2>
         <ul>
@@ -1615,7 +1616,7 @@ pytest tests/ --cov=backend --cov-report=html</pre>
     </div><!-- /content -->
 
     <footer>
-      <strong>Resilience Forge (DRRA)</strong> — Building infrastructure that survives the unthinkable. &nbsp;|&nbsp;
+      <strong>DRRA</strong> — Building infrastructure that survives the unthinkable. &nbsp;|&nbsp;
       WALL-SQUAT-GRAB Framework &nbsp;|&nbsp;
       <a href="http://localhost:8000/docs">API Docs</a> &nbsp;|&nbsp;
       <a href="#devsecops" onclick="navigate('devsecops',document.querySelector('.nav-link[href=\'#devsecops\']'));return false;">DevSecOps Pipeline</a>

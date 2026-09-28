@@ -1,4 +1,4 @@
-# Resilience Forge (DRRA) - Quick Start Guide
+# DRRA — Distributed Ransomware Response Architecture — Quick Start Guide
 
 ## 🎯 5-Minute Get Started
 
@@ -10,8 +10,8 @@
 
 ### Step 1: Clone & Setup
 ```bash
-git clone https://github.com/resilience-forge/drra.git
-cd resilience-forge
+git clone https://github.com/nddmars/DRRA.git
+cd DRRA
 cp .env.example .env
 ```
 
@@ -279,7 +279,7 @@ docker-compose up --build
 
 ## 🚀 You're Ready!
 
-Your Resilience Forge instance is now operational. Start building ransomware-proof architecture!
+Your DRRA instance is now operational. Start building ransomware-proof architecture!
 
 **Quick Commands:**
 ```bash

@@ -2,7 +2,7 @@
 
 ## 🎯 Demo Overview
 
-This script guides you through a complete ransomware detection and response lifecycle using DRRA (Distributed Resilience and Recovery Architecture).
+This script guides you through a complete ransomware detection and response lifecycle using DRRA (Distributed Ransomware Response Architecture).
 
 **Duration**: 5-10 minutes  
 **Components**: FORGE (Attack Sim) → WATCHER (Monitor) → VIGIL (Detect) → SHIELD (Isolate)

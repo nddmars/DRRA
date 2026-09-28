@@ -2,7 +2,7 @@ title: Ransomware - Mass File Modification
 id: 12e45678-abcd-1234-ef56-789012345678
 description: Detects mass file modification patterns consistent with ransomware encryption. Triggers when >15% of files in a directory tree are modified within 60 seconds.
 status: experimental
-author: Resilience Forge Team
+author: Suryaprakash Nalluri
 date: 2026/02/19
 
 logsource:
