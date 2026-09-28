@@ -31,16 +31,11 @@ async def lifespan(app: FastAPI):
     """Application lifespan event handler."""
     logger.info("🔥 Resilience Forge starting up...")
 
-    # Fail-fast configuration audit for production deployments.
+    # Fail-fast configuration audit for production deployments: refuse to serve
+    # with development credentials rather than exposing them (DRRA-006).
     if not settings.DEBUG:
-        problems = settings.assert_production_ready()
-        if problems:
-            for p in problems:
-                logger.warning("⚠️  INSECURE CONFIG: %s", p)
-            logger.warning(
-                "⚠️  %d insecure default(s) detected. Set real secrets before "
-                "exposing this deployment.", len(problems),
-            )
+        settings.refresh_secrets()  # pick up any rotated *_FILE mounts
+        settings.enforce_secure_config()  # raises on insecure defaults
 
     # Initialize database tables
     try:
